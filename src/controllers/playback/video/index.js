@@ -1961,6 +1961,86 @@ export default function (view) {
     view.querySelector('.btnAudio').addEventListener('click', showAudioTrackSelection);
     view.querySelector('.btnSubtitles').addEventListener('click', showSubtitleTrackSelection);
 
+    // Voice chat unified button handler
+    const btnVoiceChat = view.querySelector('.btnVoiceChat');
+    const voiceChatIcon = btnVoiceChat.querySelector('.material-icons');
+    const voiceChatCount = btnVoiceChat.querySelector('.voiceChatCount');
+
+    // Voice chat button states:
+    // 1. Gray (not joined, no others) - default
+    // 2. Orange (not joined, others present) - filter: hue-rotate
+    // 3. Pulsing (others talking) - animation
+    // 4. Green (joined, mic on) - filter: hue-rotate
+    // 5. Red (joined, mic off) - mic_off icon + red filter
+
+    btnVoiceChat.addEventListener('click', function () {
+        const SyncPlay = pluginManager.firstOfType(PluginType.SyncPlay)?.instance;
+        if (!SyncPlay || !SyncPlay.Manager) return;
+
+        const voiceCore = SyncPlay.Manager.voiceChatCore;
+        const state = voiceCore.getState();
+
+        if (state.isActive) {
+            // Toggle mute if already in voice chat
+            voiceCore.toggleMute();
+        } else {
+            // Join voice chat
+            SyncPlay.Manager.joinVoiceChat().catch(err => {
+                console.error('Failed to join voice chat:', err);
+            });
+        }
+    });
+
+    // Update voice chat button state
+    function updateVoiceChatButton() {
+        const SyncPlay = pluginManager.firstOfType(PluginType.SyncPlay)?.instance;
+        if (!SyncPlay || !SyncPlay.Manager) return;
+
+        const voiceCore = SyncPlay.Manager.voiceChatCore;
+        const state = voiceCore.getState();
+        const participantCount = state.participants.length;
+        const isInVoiceChat = state.isActive;
+        const isMuted = voiceCore.isMuted;
+
+        // Update participant count
+        if (participantCount > 0) {
+            voiceChatCount.textContent = participantCount;
+            voiceChatCount.style.display = 'inline';
+        } else {
+            voiceChatCount.style.display = 'none';
+        }
+
+        // Reset icon
+        voiceChatIcon.classList.remove('mic_off');
+        voiceChatIcon.classList.add('mic');
+        voiceChatIcon.style.color = '';
+        voiceChatIcon.style.animation = '';
+
+        if (isInVoiceChat) {
+            if (isMuted) {
+                // State 5: Joined and mic off (RED)
+                voiceChatIcon.classList.remove('mic');
+                voiceChatIcon.classList.add('mic_off');
+                voiceChatIcon.style.color = '#f44336'; // Red
+                btnVoiceChat.title = 'Unmute Microphone (' + participantCount + ' in voice)';
+            } else {
+                // State 4: Joined and mic on (GREEN)
+                voiceChatIcon.style.color = '#4caf50'; // Green
+                btnVoiceChat.title = 'Mute Microphone (' + participantCount + ' in voice)';
+            }
+        } else {
+            if (participantCount > 0) {
+                // State 2: Not joined but others present (ORANGE)
+                voiceChatIcon.style.color = '#ff9800'; // Orange
+                btnVoiceChat.title = 'Join Voice Chat (' + participantCount + ' in voice)';
+            } else {
+                // State 1: Not joined, no others (GRAY - default white)
+                voiceChatIcon.style.color = ''; // Default color
+                btnVoiceChat.title = 'Voice Chat';
+            }
+        }
+    }
+
     // HACK: Remove `emby-button` from the rating button to make it look like the other buttons
     view.querySelector('.btnUserRating').classList.remove('emby-button');
 
@@ -2068,6 +2148,40 @@ export default function (view) {
                 showIcon('wait-unpause');
             }
         });
+
+        // Voice chat event listeners
+        if (SyncPlay.Manager.voiceChatCore) {
+            Events.on(SyncPlay.Manager.voiceChatCore, 'voicechat:joined', () => {
+                updateVoiceChatButton();
+            });
+
+            Events.on(SyncPlay.Manager.voiceChatCore, 'voicechat:left', () => {
+                updateVoiceChatButton();
+            });
+
+            Events.on(SyncPlay.Manager.voiceChatCore, 'voicechat:localmute', () => {
+                updateVoiceChatButton();
+            });
+
+            Events.on(SyncPlay.Manager.voiceChatCore, 'voicechat:userjoined', () => {
+                updateVoiceChatButton();
+            });
+
+            Events.on(SyncPlay.Manager.voiceChatCore, 'voicechat:userleft', () => {
+                updateVoiceChatButton();
+            });
+
+            // Show/hide voice chat button based on SyncPlay group membership
+            Events.on(SyncPlay.Manager, 'enabled', (_event, enabled) => {
+                if (enabled) {
+                    btnVoiceChat.classList.remove('hide');
+                    updateVoiceChatButton();
+                } else {
+                    // Hide button when leaving SyncPlay group
+                    btnVoiceChat.classList.add('hide');
+                }
+            });
+        }
     }
 }
 

@@ -144,6 +144,25 @@ class WebRTCManager {
      */
     async createOffer(sessionId) {
         try {
+            // If we're muted (no local stream), temporarily restart stream for connection setup
+            const wasMuted = !this.localStream;
+            if (wasMuted) {
+                console.log('[WebRTCManager] Temporarily starting stream for offer creation (currently muted)');
+                try {
+                    this.localStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true
+                        },
+                        video: false
+                    });
+                } catch (err) {
+                    console.error('[WebRTCManager] Error starting temporary stream:', err);
+                    throw err;
+                }
+            }
+
             const pc = this.getPeerConnection(sessionId);
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
@@ -156,6 +175,23 @@ class WebRTCManager {
             }
 
             console.log('[WebRTCManager] Created offer for', sessionId);
+
+            // If we temporarily started stream, mute again
+            if (wasMuted) {
+                console.log('[WebRTCManager] Stopping temporary stream and muting again');
+                this.localStream.getTracks().forEach(track => track.stop());
+                this.localStream = null;
+
+                // Replace track with null in the peer connection we just created
+                const senders = pc.getSenders();
+                senders.forEach(sender => {
+                    if (sender.track && sender.track.kind === 'audio') {
+                        sender.replaceTrack(null).catch(err => {
+                            console.error('[WebRTCManager] Error removing temporary track:', err);
+                        });
+                    }
+                });
+            }
         } catch (error) {
             console.error('[WebRTCManager] Error creating offer:', error);
         }
@@ -252,11 +288,85 @@ class WebRTCManager {
      * @param {boolean} muted - Whether to mute
      */
     setMuted(muted) {
-        if (this.localStream) {
-            this.localStream.getAudioTracks().forEach(track => {
-                track.enabled = !muted;
+        if (muted) {
+            // When muting, stop and remove tracks to fully release microphone
+            if (this.localStream) {
+                const tracks = this.localStream.getTracks();
+                tracks.forEach(track => {
+                    track.stop();
+                    console.log('[WebRTCManager] Stopped local track:', track.kind);
+                });
+                this.localStream = null;
+            }
+
+            // Replace with null track in peer connections to stop sending
+            this.peerConnections.forEach((pc, sessionId) => {
+                const senders = pc.getSenders();
+                senders.forEach(sender => {
+                    if (sender.track && sender.track.kind === 'audio') {
+                        sender.replaceTrack(null).then(() => {
+                            console.log('[WebRTCManager] Removed audio track for peer', sessionId);
+                        }).catch(err => {
+                            console.error('[WebRTCManager] Error removing track for peer', sessionId, err);
+                        });
+                    }
+                });
             });
-            console.log('[WebRTCManager] Local stream muted:', muted);
+
+            console.log('[WebRTCManager] Muted - microphone released');
+        } else {
+            // When unmuting, restart local stream and replace tracks in peer connections
+            navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                },
+                video: false
+            }).then(async stream => {
+                this.localStream = stream;
+                console.log('[WebRTCManager] Local stream restarted (unmuted)');
+
+                // Replace tracks in all peer connections
+                for (const [sessionId, pc] of this.peerConnections.entries()) {
+                    const senders = pc.getSenders();
+                    const audioTrack = stream.getAudioTracks()[0];
+
+                    if (senders.length === 0) {
+                        // If no senders yet, add the track and renegotiate
+                        pc.addTrack(audioTrack, stream);
+                        console.log('[WebRTCManager] Added audio track for peer', sessionId);
+
+                        // Trigger renegotiation by creating new offer
+                        try {
+                            const offer = await pc.createOffer();
+                            await pc.setLocalDescription(offer);
+
+                            if (this.onSignalCallback) {
+                                this.onSignalCallback(sessionId, 'Offer', {
+                                    type: offer.type,
+                                    sdp: offer.sdp
+                                });
+                            }
+                            console.log('[WebRTCManager] Renegotiated connection for peer', sessionId);
+                        } catch (err) {
+                            console.error('[WebRTCManager] Error renegotiating for peer', sessionId, err);
+                        }
+                    } else {
+                        senders.forEach(sender => {
+                            if (sender.track === null || sender.track.kind === 'audio') {
+                                sender.replaceTrack(audioTrack).then(() => {
+                                    console.log('[WebRTCManager] Replaced audio track for peer', sessionId);
+                                }).catch(err => {
+                                    console.error('[WebRTCManager] Error replacing track for peer', sessionId, err);
+                                });
+                            }
+                        });
+                    }
+                }
+            }).catch(error => {
+                console.error('[WebRTCManager] Error restarting local stream:', error);
+            });
         }
     }
 
@@ -265,11 +375,8 @@ class WebRTCManager {
      * @returns {boolean}
      */
     isMuted() {
-        if (this.localStream) {
-            const audioTracks = this.localStream.getAudioTracks();
-            return audioTracks.length > 0 ? !audioTracks[0].enabled : false;
-        }
-        return false;
+        // If no local stream, we're in muted state
+        return !this.localStream;
     }
 }
 

@@ -83,7 +83,7 @@ class VoiceChatCore {
 
             console.log('[VoiceChatCore] Joined voice chat. My session:', this.mySessionId, 'Participants:', this.participants);
 
-            // Create peer connections with existing participants
+            // Create peer connections with existing participants FIRST (while stream is active)
             // Only create offer if our session ID is smaller (lexicographically) to avoid glare
             this.participants.forEach(participant => {
                 // Don't create connection to ourselves
@@ -97,6 +97,10 @@ class VoiceChatCore {
                     }
                 }
             });
+
+            // Start unmuted so peer connections have audio tracks
+            // User can manually mute if desired
+            this.isMuted = false;
 
             Events.trigger(this, 'voicechat:joined', [{ groupId, participants: this.participants }]);
             return state;
@@ -253,6 +257,7 @@ class VoiceChatCore {
         // Create audio element for remote stream
         const audioElement = document.createElement('audio');
         audioElement.autoplay = true;
+        audioElement.playsInline = true; // Prevent phone from entering "call mode"
         audioElement.srcObject = stream;
         audioElement.volume = 1.0;
         document.body.appendChild(audioElement);
