@@ -121,9 +121,9 @@ class GroupSelectionMenu {
             return { icon: 'mic', text: 'Not available', participants: 0 };
         }
 
-        const isJoined = voiceChatCore.isJoined();
-        const isMuted = voiceChatCore.isMuted();
-        const participants = voiceChatCore.getParticipants().length;
+        const isJoined = voiceChatCore.isActive;
+        const isMuted = voiceChatCore.isMuted;
+        const participants = voiceChatCore.participants?.length || 0;
 
         let icon = 'mic';
         let text = 'Join Voice Chat';
@@ -253,7 +253,7 @@ class GroupSelectionMenu {
             return;
         }
 
-        if (voiceChatCore.isJoined()) {
+        if (voiceChatCore.isActive) {
             // Show sub-menu for mute/leave options
             this.showVoiceChatOptions();
         } else {
@@ -267,7 +267,7 @@ class GroupSelectionMenu {
      */
     showVoiceChatOptions() {
         const voiceChatCore = this.SyncPlay?.Manager.voiceChatCore;
-        const isMuted = voiceChatCore.isMuted();
+        const isMuted = voiceChatCore.isMuted;
 
         const menuItems = [
             {
