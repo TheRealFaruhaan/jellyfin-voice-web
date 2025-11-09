@@ -146,6 +146,16 @@ class GroupSelectionMenu {
      */
     showLeaveGroupSelection(button, user, apiClient) {
         const groupInfo = this.SyncPlay?.Manager.getGroupInfo();
+
+        if (!groupInfo) {
+            console.error('GroupInfo is null when trying to show leave group menu');
+            loading.hide();
+            toast({
+                text: globalize.translate('MessageSyncPlayNoGroupsAvailable')
+            });
+            return;
+        }
+
         const menuItems = [];
 
         if (!this.SyncPlay?.Manager.isPlaylistEmpty()
