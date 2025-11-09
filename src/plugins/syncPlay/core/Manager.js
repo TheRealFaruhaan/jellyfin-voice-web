@@ -8,6 +8,8 @@ import TimeSyncCore from './timeSync/TimeSyncCore';
 import PlaybackCore from './PlaybackCore';
 import QueueCore from './QueueCore';
 import Controller from './Controller';
+import VoiceChatCore from '../voiceChat/VoiceChatCore';
+import VoiceChatUI from '../voiceChat/VoiceChatUI';
 import toast from '../../../components/toast/toast';
 import globalize from '../../../lib/globalize';
 import Events from '../../../utils/events.ts';
@@ -40,6 +42,10 @@ class Manager {
 
         this.currentPlayer = null;
         this.playerWrapper = null;
+
+        // Voice chat components (initialized when apiClient is available)
+        this.voiceChatCore = null;
+        this.voiceChatUI = null;
     }
 
     /**
@@ -58,6 +64,20 @@ class Manager {
         this.playbackCore.init(this);
         this.queueCore.init(this);
         this.controller.init(this);
+
+        // Initialize voice chat
+        this.voiceChatCore = new VoiceChatCore(apiClient);
+        this.voiceChatUI = new VoiceChatUI(this.voiceChatCore, this);
+
+        // Create voice chat UI and attach to document body
+        if (document.body) {
+            this.voiceChatUI.create(document.body);
+        } else {
+            // If body not ready yet, wait for DOM to load
+            document.addEventListener('DOMContentLoaded', () => {
+                this.voiceChatUI.create(document.body);
+            });
+        }
 
         Events.on(this.timeSyncCore, 'time-sync-server-update', (event, timeOffset, ping) => {
             // Report ping back to server.
@@ -408,6 +428,13 @@ class Manager {
         Events.trigger(this, 'enabled', [false]);
         this.playerWrapper.unbindFromPlayer();
 
+        // Leave voice chat when leaving group
+        if (this.voiceChatCore && this.voiceChatCore.getState().isActive) {
+            this.voiceChatCore.leave().catch(err => {
+                console.error('Error leaving voice chat:', err);
+            });
+        }
+
         if (showMessage) {
             toast(globalize.translate('MessageSyncPlayDisabled'));
         }
@@ -492,6 +519,71 @@ class Manager {
     clearSyncIcon() {
         this.syncMethod = 'None';
         Events.trigger(this, 'syncing', [false, this.syncMethod]);
+    }
+
+    /**
+     * Join voice chat for the current group.
+     * @returns {Promise} A Promise fulfilled upon joining voice chat.
+     */
+    async joinVoiceChat() {
+        if (!this.isSyncPlayEnabled() || !this.groupInfo) {
+            toast('Join a SyncPlay group first to use voice chat');
+            return;
+        }
+
+        try {
+            // Set the group ID in voice chat core state so UI can access it
+            if (this.voiceChatCore) {
+                const state = this.voiceChatCore.getState();
+                state.groupId = this.groupInfo.GroupId;
+            }
+            await this.voiceChatCore.join(this.groupInfo.GroupId);
+            toast('Joined voice chat');
+        } catch (error) {
+            console.error('Failed to join voice chat:', error);
+            toast('Failed to join voice chat: ' + error.message);
+        }
+    }
+
+    /**
+     * Leave voice chat.
+     * @returns {Promise} A Promise fulfilled upon leaving voice chat.
+     */
+    async leaveVoiceChat() {
+        try {
+            await this.voiceChatCore.leave();
+            toast('Left voice chat');
+        } catch (error) {
+            console.error('Failed to leave voice chat:', error);
+        }
+    }
+
+    /**
+     * Toggle mute in voice chat.
+     * @returns {Promise} A Promise fulfilled upon toggling mute.
+     */
+    async toggleVoiceChatMute() {
+        try {
+            await this.voiceChatCore.toggleMute();
+        } catch (error) {
+            console.error('Failed to toggle mute:', error);
+        }
+    }
+
+    /**
+     * Get voice chat core instance.
+     * @returns {VoiceChatCore} The voice chat core.
+     */
+    getVoiceChatCore() {
+        return this.voiceChatCore;
+    }
+
+    /**
+     * Get voice chat UI instance.
+     * @returns {VoiceChatUI} The voice chat UI.
+     */
+    getVoiceChatUI() {
+        return this.voiceChatUI;
     }
 }
 

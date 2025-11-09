@@ -192,6 +192,14 @@ function onMessageReceived(e, msg) {
         SyncPlay?.Manager.processCommand(msg.Data, apiClient);
     } else if (msg.MessageType === 'SyncPlayGroupUpdate') {
         SyncPlay?.Manager.processGroupUpdate(msg.Data, apiClient);
+    } else if (msg.MessageType === 'VoiceChatSignal') {
+        // Route voice chat signals to VoiceChatCore
+        if (SyncPlay?.Manager?.voiceChatCore) {
+            SyncPlay.Manager.voiceChatCore.handleSignal(msg.Data);
+        }
+    } else if (msg.MessageType === 'VoiceChatState') {
+        // Trigger event for voice chat state updates
+        Events.trigger(serverNotifications, 'VoiceChatState', [apiClient, msg.Data]);
     } else {
         Events.trigger(serverNotifications, msg.MessageType, [apiClient, msg.Data]);
     }

@@ -47,7 +47,29 @@ class VoiceChatCore {
             // Get configuration
             if (!this.configuration) {
                 this.configuration = await this.api.getConfiguration();
-                this.webrtc.initialize(this.configuration.IceServers);
+
+                // Convert ICE server configuration from PascalCase to camelCase for WebRTC
+                const iceServers = (this.configuration.IceServers || []).map(server => {
+                    const config = {
+                        urls: server.Urls || server.urls
+                    };
+
+                    if (server.Username || server.username) {
+                        config.username = server.Username || server.username;
+                    }
+
+                    if (server.Credential || server.credential) {
+                        config.credential = server.Credential || server.credential;
+                    }
+
+                    if (server.CredentialType || server.credentialType) {
+                        config.credentialType = server.CredentialType || server.credentialType;
+                    }
+
+                    return config;
+                });
+
+                this.webrtc.initialize(iceServers);
             }
 
             // Start local stream
@@ -56,19 +78,27 @@ class VoiceChatCore {
             // Join voice chat on server
             const state = await this.api.joinVoiceChat(groupId);
             this.participants = state.Participants || [];
+            this.mySessionId = state.MySessionId; // Store our session ID
             this.isActive = true;
 
-            console.log('[VoiceChatCore] Joined voice chat. Participants:', this.participants);
+            console.log('[VoiceChatCore] Joined voice chat. My session:', this.mySessionId, 'Participants:', this.participants);
 
             // Create peer connections with existing participants
+            // Only create offer if our session ID is smaller (lexicographically) to avoid glare
             this.participants.forEach(participant => {
                 // Don't create connection to ourselves
-                if (participant.SessionId !== this.apiClient.getCurrentUserId()) {
-                    this.webrtc.createOffer(participant.SessionId);
+                if (participant.SessionId !== this.mySessionId) {
+                    // Use tie-breaker: only the peer with smaller session ID initiates
+                    if (this.mySessionId < participant.SessionId) {
+                        console.log('[VoiceChatCore] Creating offer to', participant.SessionId, '(my ID is smaller)');
+                        this.webrtc.createOffer(participant.SessionId);
+                    } else {
+                        console.log('[VoiceChatCore] Waiting for offer from', participant.SessionId, '(their ID is smaller)');
+                    }
                 }
             });
 
-            Events.trigger(this, 'voicechat:joined', { groupId, participants: this.participants });
+            Events.trigger(this, 'voicechat:joined', [{ groupId, participants: this.participants }]);
             return state;
         } catch (error) {
             console.error('[VoiceChatCore] Error joining voice chat:', error);
@@ -91,7 +121,7 @@ class VoiceChatCore {
             await this.api.leaveVoiceChat(this.groupId);
             this.cleanup();
 
-            Events.trigger(this, 'voicechat:left', { groupId: this.groupId });
+            Events.trigger(this, 'voicechat:left', [{ groupId: this.groupId }]);
         } catch (error) {
             console.error('[VoiceChatCore] Error leaving voice chat:', error);
             this.cleanup();
@@ -173,10 +203,15 @@ class VoiceChatCore {
         console.log('[VoiceChatCore] User joined:', participant.UserName);
         this.participants.push(participant);
 
-        // Create offer to new participant
-        await this.webrtc.createOffer(participant.SessionId);
+        // Apply tie-breaker: only create offer if our session ID is smaller
+        if (this.mySessionId && this.mySessionId < participant.SessionId) {
+            console.log('[VoiceChatCore] Creating offer to new participant', participant.SessionId, '(my ID is smaller)');
+            await this.webrtc.createOffer(participant.SessionId);
+        } else {
+            console.log('[VoiceChatCore] Waiting for offer from new participant', participant.SessionId, '(their ID is smaller)');
+        }
 
-        Events.trigger(this, 'voicechat:userjoined', { participant });
+        Events.trigger(this, 'voicechat:userjoined', [{ participant }]);
     }
 
     /**
@@ -189,7 +224,7 @@ class VoiceChatCore {
         this.webrtc.removePeerConnection(participant.SessionId);
         this.removeRemoteStream(participant.SessionId);
 
-        Events.trigger(this, 'voicechat:userleft', { participant });
+        Events.trigger(this, 'voicechat:userleft', [{ participant }]);
     }
 
     /**
@@ -200,7 +235,7 @@ class VoiceChatCore {
         const existing = this.participants.find(p => p.SessionId === participant.SessionId);
         if (existing) {
             existing.IsMuted = participant.IsMuted;
-            Events.trigger(this, 'voicechat:mutechanged', { participant });
+            Events.trigger(this, 'voicechat:mutechanged', [{ participant }]);
         }
     }
 
@@ -224,7 +259,7 @@ class VoiceChatCore {
 
         this.remoteStreams.set(sessionId, { stream, audioElement });
 
-        Events.trigger(this, 'voicechat:remotestream', { sessionId, stream });
+        Events.trigger(this, 'voicechat:remotestream', [{ sessionId, stream }]);
     }
 
     /**
@@ -254,7 +289,7 @@ class VoiceChatCore {
         if (this.groupId) {
             try {
                 await this.api.updateMuteStatus(this.groupId, this.isMuted);
-                Events.trigger(this, 'voicechat:localmute', { isMuted: this.isMuted });
+                Events.trigger(this, 'voicechat:localmute', [{ isMuted: this.isMuted }]);
             } catch (error) {
                 console.error('[VoiceChatCore] Error updating mute status:', error);
             }

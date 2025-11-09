@@ -6,9 +6,11 @@
 import Events from '../../../utils/events.ts';
 
 class VoiceChatUI {
-    constructor(voiceChatCore) {
+    constructor(voiceChatCore, manager) {
         this.core = voiceChatCore;
+        this.manager = manager;
         this.container = null;
+        this.joinButton = null;
         this.muteButton = null;
         this.leaveButton = null;
         this.participantsList = null;
@@ -27,6 +29,38 @@ class VoiceChatUI {
      * @param {HTMLElement} parentElement - Parent element to attach UI to
      */
     create(parentElement) {
+        // Create floating join button (always visible when in SyncPlay group)
+        this.joinButton = document.createElement('button');
+        this.joinButton.innerHTML = '🎤';
+        this.joinButton.title = 'Join Voice Chat';
+        this.joinButton.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #00a4dc;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 28px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            transition: background 0.2s, transform 0.2s;
+            display: block;
+        `;
+        this.joinButton.onmouseover = () => {
+            this.joinButton.style.background = '#0080b0';
+            this.joinButton.style.transform = 'scale(1.1)';
+        };
+        this.joinButton.onmouseout = () => {
+            this.joinButton.style.background = '#00a4dc';
+            this.joinButton.style.transform = 'scale(1)';
+        };
+        this.joinButton.onclick = () => this.join();
+        parentElement.appendChild(this.joinButton);
+
         // Create container
         this.container = document.createElement('div');
         this.container.className = 'voicechat-container';
@@ -184,6 +218,18 @@ class VoiceChatUI {
     }
 
     /**
+     * Join voice chat
+     */
+    async join() {
+        // Use manager's joinVoiceChat method
+        if (this.manager) {
+            await this.manager.joinVoiceChat();
+        } else {
+            console.error('Manager not available for voice chat');
+        }
+    }
+
+    /**
      * Toggle mute
      */
     async toggleMute() {
@@ -201,6 +247,10 @@ class VoiceChatUI {
      * Handle joined event
      */
     onJoined(data) {
+        // Hide join button, show voice chat panel
+        if (this.joinButton) {
+            this.joinButton.style.display = 'none';
+        }
         this.show();
         this.updateParticipants();
     }
@@ -209,6 +259,10 @@ class VoiceChatUI {
      * Handle left event
      */
     onLeft() {
+        // Show join button again, hide voice chat panel
+        if (this.joinButton) {
+            this.joinButton.style.display = 'block';
+        }
         this.hide();
         if (this.participantsList) {
             this.participantsList.innerHTML = '';
@@ -250,9 +304,13 @@ class VoiceChatUI {
      * Destroy the UI
      */
     destroy() {
+        if (this.joinButton && this.joinButton.parentNode) {
+            this.joinButton.parentNode.removeChild(this.joinButton);
+        }
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);
         }
+        this.joinButton = null;
         this.container = null;
         this.muteButton = null;
         this.leaveButton = null;

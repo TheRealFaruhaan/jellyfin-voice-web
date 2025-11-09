@@ -173,6 +173,12 @@ class WebRTCManager {
 
             switch (type) {
                 case 'Offer':
+                    // Handle offer collision - if we're already waiting for answer, ignore the incoming offer
+                    if (pc.signalingState === 'have-local-offer') {
+                        console.log('[WebRTCManager] Offer collision detected, ignoring incoming offer from', fromSessionId);
+                        return;
+                    }
+
                     await pc.setRemoteDescription(new RTCSessionDescription(data));
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
@@ -187,8 +193,13 @@ class WebRTCManager {
                     break;
 
                 case 'Answer':
-                    await pc.setRemoteDescription(new RTCSessionDescription(data));
-                    console.log('[WebRTCManager] Handled answer from', fromSessionId);
+                    // Only set remote description if we're expecting an answer
+                    if (pc.signalingState === 'have-local-offer') {
+                        await pc.setRemoteDescription(new RTCSessionDescription(data));
+                        console.log('[WebRTCManager] Handled answer from', fromSessionId);
+                    } else {
+                        console.log('[WebRTCManager] Ignoring answer from', fromSessionId, '- not in correct state:', pc.signalingState);
+                    }
                     break;
 
                 case 'IceCandidate':
