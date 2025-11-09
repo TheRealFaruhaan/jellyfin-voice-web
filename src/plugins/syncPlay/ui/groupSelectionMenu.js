@@ -112,6 +112,33 @@ class GroupSelectionMenu {
     }
 
     /**
+     * Gets voice chat status and participant info for display.
+     * @returns {Object} Voice chat info including icon, status text, and participant count.
+     */
+    getVoiceChatInfo() {
+        const voiceChatCore = this.SyncPlay?.Manager.voiceChatCore;
+        if (!voiceChatCore) {
+            return { icon: 'mic', text: 'Not available', participants: 0 };
+        }
+
+        const isJoined = voiceChatCore.isJoined();
+        const isMuted = voiceChatCore.isMuted();
+        const participants = voiceChatCore.getParticipants().length;
+
+        let icon = 'mic';
+        let text = 'Join Voice Chat';
+
+        if (isJoined) {
+            icon = isMuted ? 'mic_off' : 'mic';
+            text = isMuted ? 'Voice Chat (Muted)' : 'Voice Chat (Active)';
+        } else if (participants > 0) {
+            text = `Join Voice Chat (${participants} in call)`;
+        }
+
+        return { icon, text, participants, isJoined, isMuted };
+    }
+
+    /**
      * Used when user has joined a group.
      * @param {HTMLElement} button - Element where to place the menu.
      * @param {Object} user - Current user.
@@ -139,6 +166,18 @@ class GroupSelectionMenu {
                 secondaryText: globalize.translate('LabelSyncPlayHaltPlaybackDescription')
             });
         }
+
+        // Add Voice Chat menu item
+        const voiceInfo = this.getVoiceChatInfo();
+        menuItems.push({
+            name: voiceInfo.text,
+            icon: voiceInfo.icon,
+            id: 'voice-chat',
+            selected: false,
+            secondaryText: voiceInfo.isJoined
+                ? 'Click to toggle mute or leave voice chat'
+                : 'Join the group voice chat'
+        });
 
         menuItems.push({
             name: globalize.translate('Settings'),
@@ -170,6 +209,8 @@ class GroupSelectionMenu {
                 this.SyncPlay?.Manager.resumeGroupPlayback(apiClient);
             } else if (id == 'halt-playback') {
                 this.SyncPlay?.Manager.haltGroupPlayback(apiClient);
+            } else if (id == 'voice-chat') {
+                this.handleVoiceChatAction();
             } else if (id == 'leave-group') {
                 apiClient.leaveSyncPlayGroup();
             } else if (id == 'settings') {
@@ -188,6 +229,69 @@ class GroupSelectionMenu {
         });
 
         loading.hide();
+    }
+
+    /**
+     * Handles voice chat menu item click.
+     */
+    handleVoiceChatAction() {
+        const voiceChatCore = this.SyncPlay?.Manager.voiceChatCore;
+        if (!voiceChatCore) {
+            toast({
+                text: 'Voice chat is not available'
+            });
+            return;
+        }
+
+        if (voiceChatCore.isJoined()) {
+            // Show sub-menu for mute/leave options
+            this.showVoiceChatOptions();
+        } else {
+            // Join voice chat
+            this.SyncPlay?.Manager.joinVoiceChat();
+        }
+    }
+
+    /**
+     * Shows voice chat options when already in voice.
+     */
+    showVoiceChatOptions() {
+        const voiceChatCore = this.SyncPlay?.Manager.voiceChatCore;
+        const isMuted = voiceChatCore.isMuted();
+
+        const menuItems = [
+            {
+                name: isMuted ? 'Unmute Microphone' : 'Mute Microphone',
+                icon: isMuted ? 'mic' : 'mic_off',
+                id: 'toggle-mute',
+                selected: false,
+                secondaryText: isMuted ? 'Turn your microphone on' : 'Turn your microphone off'
+            },
+            {
+                name: 'Leave Voice Chat',
+                icon: 'call_end',
+                id: 'leave-voice',
+                selected: true,
+                secondaryText: 'Disconnect from voice chat'
+            }
+        ];
+
+        const menuOptions = {
+            title: 'Voice Chat',
+            items: menuItems
+        };
+
+        actionsheet.show(menuOptions).then((id) => {
+            if (id == 'toggle-mute') {
+                voiceChatCore.toggleMute();
+            } else if (id == 'leave-voice') {
+                this.SyncPlay?.Manager.leaveVoiceChat();
+            }
+        }).catch((error) => {
+            if (error) {
+                console.error('SyncPlay: unexpected error showing voice chat menu:', error);
+            }
+        });
     }
 
     /**

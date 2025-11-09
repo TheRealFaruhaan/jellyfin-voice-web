@@ -2181,6 +2181,12 @@ export default function (view) {
                     btnVoiceChat.classList.add('hide');
                 }
             });
+
+            // Check if SyncPlay is already enabled when player loads
+            if (SyncPlay.Manager.isSyncPlayEnabled()) {
+                btnVoiceChat.classList.remove('hide');
+                updateVoiceChatButton();
+            }
         }
     }
 }
