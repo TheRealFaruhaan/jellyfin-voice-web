@@ -177,6 +177,7 @@ function loadPlatformFeatures() {
 
     if (!browser.tv && !browser.xboxOne) {
         import('./components/playback/playbackorientation');
+        import('./components/playback/playbackwakelock');
         registerServiceWorker();
 
         if (window.Notification) {

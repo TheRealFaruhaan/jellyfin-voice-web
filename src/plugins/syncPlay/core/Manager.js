@@ -412,6 +412,9 @@ class Manager {
         if (showMessage) {
             toast(globalize.translate('MessageSyncPlayEnabled'));
         }
+
+        // Automatically attempt to join voice chat when joining sync play
+        this.autoJoinVoiceChat();
     }
 
     /**
@@ -555,6 +558,35 @@ class Manager {
             toast('Left voice chat');
         } catch (error) {
             console.error('Failed to leave voice chat:', error);
+        }
+    }
+
+    /**
+     * Automatically join voice chat when joining a sync play session.
+     * Silently fails if voice chat is not available or if joining fails.
+     */
+    async autoJoinVoiceChat() {
+        if (!this.isSyncPlayEnabled() || !this.groupInfo) {
+            console.debug('Cannot auto-join voice chat: SyncPlay not enabled');
+            return;
+        }
+
+        if (!this.voiceChatCore) {
+            console.debug('Cannot auto-join voice chat: Voice chat core not available');
+            return;
+        }
+
+        try {
+            // Set the group ID in voice chat core state so UI can access it
+            const state = this.voiceChatCore.getState();
+            state.groupId = this.groupInfo.GroupId;
+
+            // Attempt to join voice chat
+            await this.voiceChatCore.join(this.groupInfo.GroupId);
+            console.debug('Auto-joined voice chat successfully');
+        } catch (error) {
+            // Silently fail - user can still manually join via the voice button
+            console.debug('Auto-join voice chat failed (user can still join manually):', error.message);
         }
     }
 
