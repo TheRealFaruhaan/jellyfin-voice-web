@@ -313,7 +313,10 @@ class GroupSelectionMenu {
 
         const apiClient = ServerConnections.currentApiClient();
         ServerConnections.user(apiClient).then((user) => {
-            if (this.syncPlayEnabled) {
+            // Check both the flag and the actual Manager state to handle race conditions
+            const isEnabled = this.syncPlayEnabled || (this.SyncPlay?.Manager.isSyncPlayEnabled() ?? false);
+
+            if (isEnabled) {
                 this.showLeaveGroupSelection(button, user, apiClient);
             } else {
                 this.showNewJoinGroupSelection(button, user, apiClient);
