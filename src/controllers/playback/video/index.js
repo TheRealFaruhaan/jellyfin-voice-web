@@ -2010,31 +2010,32 @@ export default function (view) {
             voiceChatCount.style.display = 'none';
         }
 
-        // Reset all states
-        voiceChatIcon.style.filter = '';
-        voiceChatIcon.style.animation = '';
+        // Reset icon
         voiceChatIcon.classList.remove('mic_off');
         voiceChatIcon.classList.add('mic');
+        voiceChatIcon.style.color = '';
+        voiceChatIcon.style.animation = '';
 
         if (isInVoiceChat) {
             if (isMuted) {
                 // State 5: Joined and mic off (RED)
                 voiceChatIcon.classList.remove('mic');
                 voiceChatIcon.classList.add('mic_off');
-                voiceChatIcon.style.filter = 'hue-rotate(-60deg) saturate(2)'; // Red
+                voiceChatIcon.style.color = '#f44336'; // Red
                 btnVoiceChat.title = 'Unmute Microphone (' + participantCount + ' in voice)';
             } else {
                 // State 4: Joined and mic on (GREEN)
-                voiceChatIcon.style.filter = 'hue-rotate(60deg) saturate(1.5)'; // Green
+                voiceChatIcon.style.color = '#4caf50'; // Green
                 btnVoiceChat.title = 'Mute Microphone (' + participantCount + ' in voice)';
             }
         } else {
             if (participantCount > 0) {
                 // State 2: Not joined but others present (ORANGE)
-                voiceChatIcon.style.filter = 'hue-rotate(-120deg) saturate(1.5)'; // Orange
+                voiceChatIcon.style.color = '#ff9800'; // Orange
                 btnVoiceChat.title = 'Join Voice Chat (' + participantCount + ' in voice)';
             } else {
-                // State 1: Not joined, no others (GRAY - default)
+                // State 1: Not joined, no others (GRAY - default white)
+                voiceChatIcon.style.color = ''; // Default color
                 btnVoiceChat.title = 'Voice Chat';
             }
         }
