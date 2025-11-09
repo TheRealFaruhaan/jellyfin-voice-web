@@ -1,62 +1,77 @@
 import { playbackManager } from './playbackmanager';
-import layoutManager from '../layoutManager';
 import Events from '../../utils/events.ts';
 import Screenfull from 'screenfull';
 
-let orientationLocked;
+let orientationLocked = false;
 
-function lockToLandscape() {
-    if (!layoutManager.mobile) {
-        return;
+async function lockToLandscape() {
+    // Try modern Screen Orientation API first
+    if (screen.orientation && screen.orientation.lock) {
+        try {
+            await screen.orientation.lock('landscape');
+            orientationLocked = true;
+            console.debug('Screen orientation locked to landscape');
+            return;
+        } catch (err) {
+            console.debug('Screen orientation lock failed (may require fullscreen):', err.message);
+            // Continue to try legacy APIs
+        }
     }
 
+    // Fallback to legacy APIs for older browsers
     const lockOrientation = window.screen.lockOrientation ||
                            window.screen.mozLockOrientation ||
-                           window.screen.msLockOrientation ||
-                           (window.screen.orientation?.lock);
+                           window.screen.msLockOrientation;
 
     if (lockOrientation) {
         try {
-            const promise = lockOrientation('landscape');
-            if (promise && promise.then) {
-                promise.then(onOrientationChangeSuccess, onOrientationChangeError);
+            const result = lockOrientation('landscape');
+            if (result && result.then) {
+                result.then(() => {
+                    orientationLocked = true;
+                    console.debug('Screen orientation locked to landscape (legacy API)');
+                }, (err) => {
+                    console.debug('Legacy orientation lock failed:', err);
+                });
             } else {
-                // returns a boolean
-                orientationLocked = promise;
+                orientationLocked = !!result;
             }
         } catch (err) {
-            onOrientationChangeError(err);
+            console.debug('Legacy orientation lock error:', err);
         }
     }
 }
 
-function unlockOrientation() {
+async function unlockOrientation() {
     if (!orientationLocked) {
         return;
     }
 
+    // Try modern Screen Orientation API first
+    if (screen.orientation && screen.orientation.unlock) {
+        try {
+            screen.orientation.unlock();
+            orientationLocked = false;
+            console.debug('Screen orientation unlocked');
+            return;
+        } catch (err) {
+            console.debug('Screen orientation unlock failed:', err.message);
+        }
+    }
+
+    // Fallback to legacy APIs
     const unlock = window.screen.unlockOrientation ||
                    window.screen.mozUnlockOrientation ||
-                   window.screen.msUnlockOrientation ||
-                   (window.screen.orientation?.unlock);
+                   window.screen.msUnlockOrientation;
 
     if (unlock) {
         try {
             unlock();
             orientationLocked = false;
         } catch (err) {
-            console.error('error unlocking orientation: ' + err);
+            console.debug('Legacy orientation unlock error:', err);
         }
     }
-}
-
-function onOrientationChangeSuccess() {
-    orientationLocked = true;
-}
-
-function onOrientationChangeError(err) {
-    orientationLocked = false;
-    console.error('error locking orientation: ' + err);
 }
 
 Events.on(playbackManager, 'playbackstart', function (e, player) {
