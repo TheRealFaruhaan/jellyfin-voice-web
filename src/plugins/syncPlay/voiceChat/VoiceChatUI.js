@@ -26,40 +26,13 @@ class VoiceChatUI {
 
     /**
      * Create and show the voice chat UI
+     * Note: Voice chat controls are now integrated into the video player OSD.
+     * This method is kept for compatibility but no longer creates floating buttons.
      * @param {HTMLElement} parentElement - Parent element to attach UI to
      */
     create(parentElement) {
-        // Create floating join button (always visible when in SyncPlay group)
-        this.joinButton = document.createElement('button');
-        this.joinButton.innerHTML = '🎤';
-        this.joinButton.title = 'Join Voice Chat';
-        this.joinButton.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: #00a4dc;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-size: 28px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            z-index: 1000;
-            transition: background 0.2s, transform 0.2s;
-            display: block;
-        `;
-        this.joinButton.onmouseover = () => {
-            this.joinButton.style.background = '#0080b0';
-            this.joinButton.style.transform = 'scale(1.1)';
-        };
-        this.joinButton.onmouseout = () => {
-            this.joinButton.style.background = '#00a4dc';
-            this.joinButton.style.transform = 'scale(1)';
-        };
-        this.joinButton.onclick = () => this.join();
-        parentElement.appendChild(this.joinButton);
+        // Voice chat buttons are now integrated into the video player controls
+        // No floating UI needed anymore
 
         // Create container
         this.container = document.createElement('div');
@@ -247,10 +220,8 @@ class VoiceChatUI {
      * Handle joined event
      */
     onJoined(data) {
-        // Hide join button, show voice chat panel
-        if (this.joinButton) {
-            this.joinButton.style.display = 'none';
-        }
+        // Voice chat buttons are now managed by the video player OSD
+        // Just update participants list if needed
         this.show();
         this.updateParticipants();
     }
@@ -259,10 +230,7 @@ class VoiceChatUI {
      * Handle left event
      */
     onLeft() {
-        // Show join button again, hide voice chat panel
-        if (this.joinButton) {
-            this.joinButton.style.display = 'block';
-        }
+        // Voice chat buttons are now managed by the video player OSD
         this.hide();
         if (this.participantsList) {
             this.participantsList.innerHTML = '';
@@ -304,13 +272,10 @@ class VoiceChatUI {
      * Destroy the UI
      */
     destroy() {
-        if (this.joinButton && this.joinButton.parentNode) {
-            this.joinButton.parentNode.removeChild(this.joinButton);
-        }
+        // Voice chat buttons are now in the video player OSD, only clean up the container
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);
         }
-        this.joinButton = null;
         this.container = null;
         this.muteButton = null;
         this.leaveButton = null;
