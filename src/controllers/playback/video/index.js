@@ -1961,53 +1961,82 @@ export default function (view) {
     view.querySelector('.btnAudio').addEventListener('click', showAudioTrackSelection);
     view.querySelector('.btnSubtitles').addEventListener('click', showSubtitleTrackSelection);
 
-    // Voice chat button handlers
+    // Voice chat unified button handler
     const btnVoiceChat = view.querySelector('.btnVoiceChat');
-    const btnVoiceChatMute = view.querySelector('.btnVoiceChatMute');
+    const voiceChatIcon = btnVoiceChat.querySelector('.material-icons');
+    const voiceChatCount = btnVoiceChat.querySelector('.voiceChatCount');
+
+    // Voice chat button states:
+    // 1. Gray (not joined, no others) - default
+    // 2. Orange (not joined, others present) - filter: hue-rotate
+    // 3. Pulsing (others talking) - animation
+    // 4. Green (joined, mic on) - filter: hue-rotate
+    // 5. Red (joined, mic off) - mic_off icon + red filter
 
     btnVoiceChat.addEventListener('click', function () {
         const SyncPlay = pluginManager.firstOfType(PluginType.SyncPlay)?.instance;
-        if (SyncPlay && SyncPlay.Manager) {
-            SyncPlay.Manager.joinVoiceChat().then(() => {
-                updateVoiceChatButtons(true, false);
-            }).catch(err => {
+        if (!SyncPlay || !SyncPlay.Manager) return;
+
+        const voiceCore = SyncPlay.Manager.voiceChatCore;
+        const state = voiceCore.getState();
+
+        if (state.isActive) {
+            // Toggle mute if already in voice chat
+            voiceCore.toggleMute();
+        } else {
+            // Join voice chat
+            SyncPlay.Manager.joinVoiceChat().catch(err => {
                 console.error('Failed to join voice chat:', err);
             });
         }
     });
 
-    btnVoiceChatMute.addEventListener('click', function () {
+    // Update voice chat button state
+    function updateVoiceChatButton() {
         const SyncPlay = pluginManager.firstOfType(PluginType.SyncPlay)?.instance;
-        if (SyncPlay && SyncPlay.Manager && SyncPlay.Manager.voiceChatCore) {
-            const isMuted = SyncPlay.Manager.voiceChatCore.isMuted;
-            SyncPlay.Manager.voiceChatCore.toggleMute().then(() => {
-                updateVoiceChatMuteButton(!isMuted);
-            });
-        }
-    });
+        if (!SyncPlay || !SyncPlay.Manager) return;
 
-    // Update voice chat button visibility and state
-    function updateVoiceChatButtons(isInVoiceChat, isMuted) {
+        const voiceCore = SyncPlay.Manager.voiceChatCore;
+        const state = voiceCore.getState();
+        const participantCount = state.participants.length;
+        const isInVoiceChat = state.isActive;
+        const isMuted = voiceCore.isMuted;
+
+        // Update participant count
+        if (participantCount > 0) {
+            voiceChatCount.textContent = participantCount;
+            voiceChatCount.style.display = 'inline';
+        } else {
+            voiceChatCount.style.display = 'none';
+        }
+
+        // Reset all states
+        voiceChatIcon.style.filter = '';
+        voiceChatIcon.style.animation = '';
+        voiceChatIcon.classList.remove('mic_off');
+        voiceChatIcon.classList.add('mic');
+
         if (isInVoiceChat) {
-            btnVoiceChat.classList.add('hide');
-            btnVoiceChatMute.classList.remove('hide');
-            updateVoiceChatMuteButton(isMuted);
+            if (isMuted) {
+                // State 5: Joined and mic off (RED)
+                voiceChatIcon.classList.remove('mic');
+                voiceChatIcon.classList.add('mic_off');
+                voiceChatIcon.style.filter = 'hue-rotate(-60deg) saturate(2)'; // Red
+                btnVoiceChat.title = 'Unmute Microphone (' + participantCount + ' in voice)';
+            } else {
+                // State 4: Joined and mic on (GREEN)
+                voiceChatIcon.style.filter = 'hue-rotate(60deg) saturate(1.5)'; // Green
+                btnVoiceChat.title = 'Mute Microphone (' + participantCount + ' in voice)';
+            }
         } else {
-            btnVoiceChat.classList.remove('hide');
-            btnVoiceChatMute.classList.add('hide');
-        }
-    }
-
-    function updateVoiceChatMuteButton(isMuted) {
-        const icon = btnVoiceChatMute.querySelector('.material-icons');
-        if (isMuted) {
-            icon.classList.remove('mic');
-            icon.classList.add('mic_off');
-            btnVoiceChatMute.title = 'Unmute Microphone';
-        } else {
-            icon.classList.remove('mic_off');
-            icon.classList.add('mic');
-            btnVoiceChatMute.title = 'Mute Microphone';
+            if (participantCount > 0) {
+                // State 2: Not joined but others present (ORANGE)
+                voiceChatIcon.style.filter = 'hue-rotate(-120deg) saturate(1.5)'; // Orange
+                btnVoiceChat.title = 'Join Voice Chat (' + participantCount + ' in voice)';
+            } else {
+                // State 1: Not joined, no others (GRAY - default)
+                btnVoiceChat.title = 'Voice Chat';
+            }
         }
     }
 
@@ -2122,27 +2151,33 @@ export default function (view) {
         // Voice chat event listeners
         if (SyncPlay.Manager.voiceChatCore) {
             Events.on(SyncPlay.Manager.voiceChatCore, 'voicechat:joined', () => {
-                updateVoiceChatButtons(true, SyncPlay.Manager.voiceChatCore.isMuted);
+                updateVoiceChatButton();
             });
 
             Events.on(SyncPlay.Manager.voiceChatCore, 'voicechat:left', () => {
-                updateVoiceChatButtons(false, false);
+                updateVoiceChatButton();
             });
 
-            Events.on(SyncPlay.Manager.voiceChatCore, 'voicechat:localmute', (_event, data) => {
-                updateVoiceChatMuteButton(data.isMuted);
+            Events.on(SyncPlay.Manager.voiceChatCore, 'voicechat:localmute', () => {
+                updateVoiceChatButton();
             });
 
-            // Show voice chat button only when in SyncPlay group
+            Events.on(SyncPlay.Manager.voiceChatCore, 'voicechat:userjoined', () => {
+                updateVoiceChatButton();
+            });
+
+            Events.on(SyncPlay.Manager.voiceChatCore, 'voicechat:userleft', () => {
+                updateVoiceChatButton();
+            });
+
+            // Show/hide voice chat button based on SyncPlay group membership
             Events.on(SyncPlay.Manager, 'enabled', (_event, enabled) => {
                 if (enabled) {
-                    // Check if already in voice chat
-                    const voiceState = SyncPlay.Manager.voiceChatCore.getState();
-                    updateVoiceChatButtons(voiceState.isActive, voiceState.isMuted);
+                    btnVoiceChat.classList.remove('hide');
+                    updateVoiceChatButton();
                 } else {
-                    // Hide both buttons when leaving SyncPlay group
+                    // Hide button when leaving SyncPlay group
                     btnVoiceChat.classList.add('hide');
-                    btnVoiceChatMute.classList.add('hide');
                 }
             });
         }
