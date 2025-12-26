@@ -46,11 +46,70 @@ class WebRTCManager {
     }
 
     /**
+     * Check if native voice chat support is available (mobile apps)
+     * @returns {boolean}
+     */
+    hasNativeSupport() {
+        return !!(window.NativeVoiceChat && window.NativeVoiceChat.isSupported);
+    }
+
+    /**
+     * Configure native audio session for voice chat
+     * This prevents mobile devices from switching to mono "call mode"
+     * @returns {Promise<boolean>}
+     */
+    async configureNativeAudioSession() {
+        if (!this.hasNativeSupport()) {
+            return true;
+        }
+
+        try {
+            console.log('[WebRTCManager] Configuring native audio session for voice chat');
+
+            if (typeof window.NativeVoiceChat.configureAudioSession === 'function') {
+                const result = window.NativeVoiceChat.configureAudioSession();
+
+                // Handle both sync and async responses
+                if (result && typeof result.then === 'function') {
+                    const response = await result;
+                    if (response && response.success === false) {
+                        console.warn('[WebRTCManager] Native audio session config failed:', response.error);
+                        return false;
+                    }
+                } else if (typeof result === 'string') {
+                    // Android returns JSON string
+                    try {
+                        const parsed = JSON.parse(result);
+                        if (parsed.success === false) {
+                            console.warn('[WebRTCManager] Native audio session config failed:', parsed.error);
+                            return false;
+                        }
+                    } catch (e) {
+                        // Ignore parse errors
+                    }
+                }
+
+                console.log('[WebRTCManager] Native audio session configured successfully');
+                return true;
+            }
+
+            return true;
+        } catch (error) {
+            console.error('[WebRTCManager] Error configuring native audio session:', error);
+            return false;
+        }
+    }
+
+    /**
      * Start local audio stream
      * @returns {Promise<MediaStream>}
      */
     async startLocalStream() {
         try {
+            // Configure native audio session before starting stream
+            // This prevents mobile devices from switching to mono call mode
+            await this.configureNativeAudioSession();
+
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
@@ -271,6 +330,24 @@ class WebRTCManager {
     }
 
     /**
+     * Restore native audio session to normal state
+     */
+    restoreNativeAudioSession() {
+        if (!this.hasNativeSupport()) {
+            return;
+        }
+
+        try {
+            if (typeof window.NativeVoiceChat.restoreAudioSession === 'function') {
+                window.NativeVoiceChat.restoreAudioSession();
+                console.log('[WebRTCManager] Native audio session restored');
+            }
+        } catch (error) {
+            console.error('[WebRTCManager] Error restoring native audio session:', error);
+        }
+    }
+
+    /**
      * Close all peer connections and stop local stream
      */
     cleanup() {
@@ -280,6 +357,10 @@ class WebRTCManager {
         });
         this.peerConnections.clear();
         this.stopLocalStream();
+
+        // Restore native audio session
+        this.restoreNativeAudioSession();
+
         console.log('[WebRTCManager] Cleaned up all connections');
     }
 

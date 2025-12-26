@@ -1642,6 +1642,12 @@ export default function (view) {
     let playbackStartTimeTicks = 0;
     let subtitleSyncOverlay;
     let trickplayResolution = null;
+
+    // Push-to-talk state variables
+    let pushToTalkActive = false;
+    let pushToTalkWasMuted = false;
+    let pushToTalkTimer = null;
+    const PUSH_TO_TALK_DELAY = 300; // ms - hold for 300ms to activate push-to-talk
     const nowPlayingVolumeSlider = view.querySelector('.osdVolumeSlider');
     const nowPlayingVolumeSliderContainer = view.querySelector('.osdVolumeSliderContainer');
     const nowPlayingPositionSlider = view.querySelector('.osdPositionSlider');
@@ -1755,6 +1761,12 @@ export default function (view) {
         if (browser.firefox || browser.edge) {
             dom.removeEventListener(document, 'click', onClickCapture, { capture: true });
         }
+
+        // Cleanup push-to-talk - defined later in the file but accessible via closure
+        if (typeof onPushToTalkEnd === 'function') {
+            onPushToTalkEnd();
+        }
+
         stopOsdHideTimer();
         headerElement.classList.remove('osdHeader');
         headerElement.classList.remove('osdHeader-hidden');
@@ -1962,9 +1974,12 @@ export default function (view) {
     view.querySelector('.btnSubtitles').addEventListener('click', showSubtitleTrackSelection);
 
     // Voice chat unified button handler
+    const voiceChatControls = view.querySelector('.voiceChatControls');
     const btnVoiceChat = view.querySelector('.btnVoiceChat');
     const voiceChatIcon = btnVoiceChat.querySelector('.material-icons');
     const voiceChatCount = btnVoiceChat.querySelector('.voiceChatCount');
+    const btnVoiceChatSettings = view.querySelector('.btnVoiceChatSettings');
+    const voiceChatVolumeControls = view.querySelector('.voiceChatVolumeControls');
 
     // Voice chat button states:
     // 1. Gray (not joined, no others) - default
@@ -1991,6 +2006,166 @@ export default function (view) {
         }
     });
 
+    // Voice chat settings button - show volume sliders
+    btnVoiceChatSettings.addEventListener('click', function () {
+        const SyncPlay = pluginManager.firstOfType(PluginType.SyncPlay)?.instance;
+        if (!SyncPlay || !SyncPlay.Manager) return;
+
+        const voiceCore = SyncPlay.Manager.voiceChatCore;
+
+        import('../../../components/actionSheet/actionSheet').then(({ default: actionsheet }) => {
+            const mediaVolume = Math.round(voiceCore.getMediaVolume() * 100);
+            const voiceVolume = Math.round(voiceCore.getVoiceChatVolume() * 100);
+
+            // Create volume control dialog
+            const dialogContent = `
+                <div style="padding: 1em; min-width: 280px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em;">
+                        <h3 style="margin: 0;">Voice Chat Volume</h3>
+                        <button id="btnCloseVoiceSettings" is="paper-icon-button-light" class="autoSize" title="Close" style="margin: -0.5em -0.5em -0.5em 0;">
+                            <span class="material-icons" aria-hidden="true">close</span>
+                        </button>
+                    </div>
+                    <div style="margin-bottom: 1.5em;">
+                        <label style="display: flex; align-items: center; margin-bottom: 0.5em;">
+                            <span class="material-icons" style="margin-right: 0.5em;">movie</span>
+                            <span>Media Volume</span>
+                        </label>
+                        <div style="display: flex; align-items: center;">
+                            <input type="range" id="voiceChatMediaVolume" min="0" max="100" value="${mediaVolume}" style="flex: 1; margin-right: 0.5em;" />
+                            <span id="voiceChatMediaVolumeValue" style="min-width: 3em; text-align: right;">${mediaVolume}%</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="display: flex; align-items: center; margin-bottom: 0.5em;">
+                            <span class="material-icons" style="margin-right: 0.5em;">mic</span>
+                            <span>Voice Chat Volume</span>
+                        </label>
+                        <div style="display: flex; align-items: center;">
+                            <input type="range" id="voiceChatVoiceVolume" min="0" max="100" value="${voiceVolume}" style="flex: 1; margin-right: 0.5em;" />
+                            <span id="voiceChatVoiceVolumeValue" style="min-width: 3em; text-align: right;">${voiceVolume}%</span>
+                        </div>
+                    </div>
+                    <div style="margin-top: 1.5em; padding-top: 1em; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <button id="btnLeaveVoiceChat" class="raised button-cancel block" style="width: 100%;">
+                            <span class="material-icons" style="margin-right: 0.5em;">call_end</span>
+                            Leave Voice Chat
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            import('../../../components/dialogHelper/dialogHelper').then(({ default: dialogHelper }) => {
+                const dlg = dialogHelper.createDialog({
+                    removeOnClose: true,
+                    size: 'small'
+                });
+
+                dlg.innerHTML = dialogContent;
+                dlg.classList.add('dialog');
+
+                const mediaVolumeSlider = dlg.querySelector('#voiceChatMediaVolume');
+                const mediaVolumeValue = dlg.querySelector('#voiceChatMediaVolumeValue');
+                const voiceVolumeSlider = dlg.querySelector('#voiceChatVoiceVolume');
+                const voiceVolumeValue = dlg.querySelector('#voiceChatVoiceVolumeValue');
+                const btnLeave = dlg.querySelector('#btnLeaveVoiceChat');
+                const btnClose = dlg.querySelector('#btnCloseVoiceSettings');
+
+                btnClose.addEventListener('click', function () {
+                    dialogHelper.close(dlg);
+                });
+
+                mediaVolumeSlider.addEventListener('input', function () {
+                    const value = parseInt(this.value, 10);
+                    mediaVolumeValue.textContent = value + '%';
+                    voiceCore.setMediaVolume(value / 100);
+                });
+
+                voiceVolumeSlider.addEventListener('input', function () {
+                    const value = parseInt(this.value, 10);
+                    voiceVolumeValue.textContent = value + '%';
+                    voiceCore.setVoiceChatVolume(value / 100);
+                });
+
+                btnLeave.addEventListener('click', function () {
+                    SyncPlay.Manager.leaveVoiceChat().then(() => {
+                        dialogHelper.close(dlg);
+                    }).catch(err => {
+                        console.error('Failed to leave voice chat:', err);
+                        dialogHelper.close(dlg);
+                    });
+                });
+
+                dialogHelper.open(dlg);
+            });
+        });
+    });
+
+    // Push-to-talk: Hold anywhere on video to talk when muted in voice chat
+    function startPushToTalk() {
+        const SyncPlay = pluginManager.firstOfType(PluginType.SyncPlay)?.instance;
+        if (!SyncPlay || !SyncPlay.Manager) return;
+
+        const voiceCore = SyncPlay.Manager.voiceChatCore;
+        const state = voiceCore.getState();
+
+        // Only activate if in voice chat and currently muted
+        if (state.isActive && voiceCore.isMuted) {
+            pushToTalkActive = true;
+            pushToTalkWasMuted = true;
+            voiceCore.toggleMute(); // Unmute
+            console.log('[VideoOSD] Push-to-talk: started speaking');
+        }
+    }
+
+    function stopPushToTalk() {
+        if (!pushToTalkActive) return;
+
+        const SyncPlay = pluginManager.firstOfType(PluginType.SyncPlay)?.instance;
+        if (!SyncPlay || !SyncPlay.Manager) return;
+
+        const voiceCore = SyncPlay.Manager.voiceChatCore;
+
+        // Re-mute if we were muted before push-to-talk
+        if (pushToTalkWasMuted && !voiceCore.isMuted) {
+            voiceCore.toggleMute(); // Mute again
+            console.log('[VideoOSD] Push-to-talk: stopped speaking');
+        }
+
+        pushToTalkActive = false;
+        pushToTalkWasMuted = false;
+    }
+
+    function onPushToTalkStart(e) {
+        // Don't activate if touching controls
+        if (dom.parentWithClass(e.target, ['videoOsdBottom', 'upNextContainer', 'osdHeader', 'voiceChatControls'])) {
+            return;
+        }
+
+        // Only for touch or left mouse button
+        if (e.button && e.button !== 0) return;
+
+        pushToTalkTimer = setTimeout(() => {
+            startPushToTalk();
+        }, PUSH_TO_TALK_DELAY);
+    }
+
+    function onPushToTalkEnd() {
+        if (pushToTalkTimer) {
+            clearTimeout(pushToTalkTimer);
+            pushToTalkTimer = null;
+        }
+        stopPushToTalk();
+    }
+
+    // Register push-to-talk event listeners
+    dom.addEventListener(view, 'touchstart', onPushToTalkStart, { passive: true });
+    dom.addEventListener(view, 'touchend', onPushToTalkEnd, { passive: true });
+    dom.addEventListener(view, 'touchcancel', onPushToTalkEnd, { passive: true });
+    dom.addEventListener(view, 'mousedown', onPushToTalkStart, { passive: true });
+    dom.addEventListener(view, 'mouseup', onPushToTalkEnd, { passive: true });
+    dom.addEventListener(view, 'mouseleave', onPushToTalkEnd, { passive: true });
+
     // Update voice chat button state
     function updateVoiceChatButton() {
         const SyncPlay = pluginManager.firstOfType(PluginType.SyncPlay)?.instance;
@@ -2010,6 +2185,13 @@ export default function (view) {
             voiceChatCount.style.display = 'none';
         }
 
+        // Show/hide settings button based on voice chat state
+        if (isInVoiceChat) {
+            voiceChatVolumeControls.classList.remove('hide');
+        } else {
+            voiceChatVolumeControls.classList.add('hide');
+        }
+
         // Reset icon
         voiceChatIcon.classList.remove('mic_off');
         voiceChatIcon.classList.add('mic');
@@ -2022,7 +2204,7 @@ export default function (view) {
                 voiceChatIcon.classList.remove('mic');
                 voiceChatIcon.classList.add('mic_off');
                 voiceChatIcon.style.color = '#f44336'; // Red
-                btnVoiceChat.title = 'Unmute Microphone (' + participantCount + ' in voice)';
+                btnVoiceChat.title = 'Unmute Microphone (' + participantCount + ' in voice) - Hold video to talk';
             } else {
                 // State 4: Joined and mic on (GREEN)
                 voiceChatIcon.style.color = '#4caf50'; // Green
@@ -2171,20 +2353,20 @@ export default function (view) {
                 updateVoiceChatButton();
             });
 
-            // Show/hide voice chat button based on SyncPlay group membership
+            // Show/hide voice chat controls container based on SyncPlay group membership
             Events.on(SyncPlay.Manager, 'enabled', (_event, enabled) => {
                 if (enabled) {
-                    btnVoiceChat.classList.remove('hide');
+                    voiceChatControls.classList.remove('hide');
                     updateVoiceChatButton();
                 } else {
-                    // Hide button when leaving SyncPlay group
-                    btnVoiceChat.classList.add('hide');
+                    // Hide controls when leaving SyncPlay group
+                    voiceChatControls.classList.add('hide');
                 }
             });
 
             // Check if SyncPlay is already enabled when player loads
             if (SyncPlay.Manager.isSyncPlayEnabled()) {
-                btnVoiceChat.classList.remove('hide');
+                voiceChatControls.classList.remove('hide');
                 updateVoiceChatButton();
             }
         }

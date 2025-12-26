@@ -6,6 +6,7 @@
 import VoiceChatApi from './VoiceChatApi';
 import WebRTCManager from './WebRTCManager';
 import Events from '../../../utils/events.ts';
+import { playbackManager } from '../../../components/playback/playbackmanager';
 
 class VoiceChatCore {
     constructor(apiClient) {
@@ -18,6 +19,8 @@ class VoiceChatCore {
         this.configuration = null;
         this.isMuted = false;
         this.remoteStreams = new Map(); // sessionId -> {stream, audioElement}
+        this.mediaVolume = 1.0;
+        this.voiceVolume = 1.0;
 
         // Bind WebRTC callbacks
         this.webrtc.onSignal((toSessionId, type, data) => {
@@ -316,6 +319,107 @@ class VoiceChatCore {
     }
 
     /**
+     * Check if native voice chat support is available (mobile apps)
+     * @returns {boolean}
+     */
+    hasNativeSupport() {
+        return !!(window.NativeVoiceChat && window.NativeVoiceChat.isSupported);
+    }
+
+    /**
+     * Set media volume (0.0 to 1.0)
+     * Controls the media playback volume independently of voice chat
+     * @param {number} volume - Volume level
+     */
+    setMediaVolume(volume) {
+        this.mediaVolume = Math.max(0, Math.min(1, volume));
+
+        // Set the actual player volume (playbackManager expects 0-100)
+        const volumePercent = Math.round(this.mediaVolume * 100);
+        playbackManager.setVolume(volumePercent);
+        console.log('[VoiceChatCore] Set media volume:', volumePercent);
+
+        // Also update via native bridge if available
+        if (this.hasNativeSupport()) {
+            window.NativeVoiceChat.setMediaVolume(this.mediaVolume);
+            console.log('[VoiceChatCore] Set media volume via native:', this.mediaVolume);
+        }
+    }
+
+    /**
+     * Set voice chat volume (0.0 to 1.0)
+     * Controls all remote voice streams
+     * @param {number} volume - Volume level
+     */
+    setVoiceChatVolume(volume) {
+        this.voiceVolume = Math.max(0, Math.min(1, volume));
+
+        // Update all remote audio elements
+        this.remoteStreams.forEach(({ audioElement }) => {
+            if (audioElement) {
+                audioElement.volume = this.voiceVolume;
+            }
+        });
+
+        // Also update via native bridge if available
+        if (this.hasNativeSupport()) {
+            window.NativeVoiceChat.setVoiceVolume(this.voiceVolume);
+            console.log('[VoiceChatCore] Set voice volume via native:', this.voiceVolume);
+        }
+    }
+
+    /**
+     * Get current media volume
+     * @returns {number}
+     */
+    getMediaVolume() {
+        // Get actual volume from playbackManager (returns 0-100), convert to 0-1
+        const currentPlayer = playbackManager.getCurrentPlayer();
+        if (currentPlayer && typeof currentPlayer.getVolume === 'function') {
+            return currentPlayer.getVolume() / 100;
+        }
+        return this.mediaVolume;
+    }
+
+    /**
+     * Get current voice chat volume
+     * @returns {number}
+     */
+    getVoiceChatVolume() {
+        return this.voiceVolume;
+    }
+
+    /**
+     * Request microphone permission (for mobile apps)
+     * @returns {Promise<boolean>}
+     */
+    async requestMicrophonePermission() {
+        if (this.hasNativeSupport()) {
+            try {
+                // Check if already has permission
+                if (typeof window.NativeVoiceChat.hasMicrophonePermission === 'function') {
+                    const hasPermission = window.NativeVoiceChat.hasMicrophonePermission();
+                    if (hasPermission === true || hasPermission === 'true') {
+                        return true;
+                    }
+                }
+
+                // Request permission
+                if (typeof window.NativeVoiceChat.requestMicrophonePermission === 'function') {
+                    window.NativeVoiceChat.requestMicrophonePermission();
+                    // On mobile, this returns asynchronously via callback
+                    return true;
+                }
+            } catch (error) {
+                console.error('[VoiceChatCore] Error requesting microphone permission:', error);
+            }
+        }
+
+        // For web, getUserMedia will prompt for permission
+        return true;
+    }
+
+    /**
      * Cleanup voice chat resources
      */
     cleanup() {
@@ -330,6 +434,18 @@ class VoiceChatCore {
 
         // Cleanup WebRTC
         this.webrtc.cleanup();
+
+        // Restore native audio session if available
+        if (this.hasNativeSupport()) {
+            try {
+                if (typeof window.NativeVoiceChat.restoreAudioSession === 'function') {
+                    window.NativeVoiceChat.restoreAudioSession();
+                    console.log('[VoiceChatCore] Restored native audio session');
+                }
+            } catch (error) {
+                console.error('[VoiceChatCore] Error restoring audio session:', error);
+            }
+        }
 
         console.log('[VoiceChatCore] Cleaned up');
     }

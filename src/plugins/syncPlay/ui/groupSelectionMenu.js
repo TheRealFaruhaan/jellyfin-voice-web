@@ -278,6 +278,13 @@ class GroupSelectionMenu {
                 secondaryText: isMuted ? 'Turn your microphone on' : 'Turn your microphone off'
             },
             {
+                name: 'Volume Settings',
+                icon: 'tune',
+                id: 'volume-settings',
+                selected: false,
+                secondaryText: 'Adjust media and voice chat volume'
+            },
+            {
                 name: 'Leave Voice Chat',
                 icon: 'call_end',
                 id: 'leave-voice',
@@ -294,6 +301,8 @@ class GroupSelectionMenu {
         actionsheet.show(menuOptions).then((id) => {
             if (id == 'toggle-mute') {
                 voiceChatCore.toggleMute();
+            } else if (id == 'volume-settings') {
+                this.showVolumeSettings();
             } else if (id == 'leave-voice') {
                 this.SyncPlay?.Manager.leaveVoiceChat();
             }
@@ -301,6 +310,83 @@ class GroupSelectionMenu {
             if (error) {
                 console.error('SyncPlay: unexpected error showing voice chat menu:', error);
             }
+        });
+    }
+
+    /**
+     * Shows volume settings dialog for voice chat.
+     */
+    showVolumeSettings() {
+        const voiceChatCore = this.SyncPlay?.Manager.voiceChatCore;
+        if (!voiceChatCore) return;
+
+        const mediaVolume = Math.round(voiceChatCore.getMediaVolume() * 100);
+        const voiceVolume = Math.round(voiceChatCore.getVoiceChatVolume() * 100);
+
+        // Create volume control dialog
+        const dialogContent = `
+            <div style="padding: 1em; min-width: 280px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em;">
+                    <h3 style="margin: 0;">Voice Chat Volume</h3>
+                    <button id="btnCloseVolumeSettings" is="paper-icon-button-light" class="autoSize" title="Close" style="margin: -0.5em -0.5em -0.5em 0;">
+                        <span class="material-icons" aria-hidden="true">close</span>
+                    </button>
+                </div>
+                <div style="margin-bottom: 1.5em;">
+                    <label style="display: flex; align-items: center; margin-bottom: 0.5em;">
+                        <span class="material-icons" style="margin-right: 0.5em;">movie</span>
+                        <span>Media Volume</span>
+                    </label>
+                    <div style="display: flex; align-items: center;">
+                        <input type="range" id="voiceChatMediaVolume" min="0" max="100" value="${mediaVolume}" style="flex: 1; margin-right: 0.5em;" />
+                        <span id="voiceChatMediaVolumeValue" style="min-width: 3em; text-align: right;">${mediaVolume}%</span>
+                    </div>
+                </div>
+                <div style="margin-bottom: 1.5em;">
+                    <label style="display: flex; align-items: center; margin-bottom: 0.5em;">
+                        <span class="material-icons" style="margin-right: 0.5em;">mic</span>
+                        <span>Voice Chat Volume</span>
+                    </label>
+                    <div style="display: flex; align-items: center;">
+                        <input type="range" id="voiceChatVoiceVolume" min="0" max="100" value="${voiceVolume}" style="flex: 1; margin-right: 0.5em;" />
+                        <span id="voiceChatVoiceVolumeValue" style="min-width: 3em; text-align: right;">${voiceVolume}%</span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        import('../../../components/dialogHelper/dialogHelper').then(({ default: dialogHelper }) => {
+            const dlg = dialogHelper.createDialog({
+                removeOnClose: true,
+                size: 'small'
+            });
+
+            dlg.innerHTML = dialogContent;
+            dlg.classList.add('dialog');
+
+            const mediaVolumeSlider = dlg.querySelector('#voiceChatMediaVolume');
+            const mediaVolumeValue = dlg.querySelector('#voiceChatMediaVolumeValue');
+            const voiceVolumeSlider = dlg.querySelector('#voiceChatVoiceVolume');
+            const voiceVolumeValue = dlg.querySelector('#voiceChatVoiceVolumeValue');
+            const btnClose = dlg.querySelector('#btnCloseVolumeSettings');
+
+            mediaVolumeSlider.addEventListener('input', function () {
+                const value = parseInt(this.value, 10);
+                mediaVolumeValue.textContent = value + '%';
+                voiceChatCore.setMediaVolume(value / 100);
+            });
+
+            voiceVolumeSlider.addEventListener('input', function () {
+                const value = parseInt(this.value, 10);
+                voiceVolumeValue.textContent = value + '%';
+                voiceChatCore.setVoiceChatVolume(value / 100);
+            });
+
+            btnClose.addEventListener('click', function () {
+                dialogHelper.close(dlg);
+            });
+
+            dialogHelper.open(dlg);
         });
     }
 
