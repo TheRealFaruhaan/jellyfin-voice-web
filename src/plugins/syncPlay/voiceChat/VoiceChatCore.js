@@ -336,8 +336,18 @@ class VoiceChatCore {
 
         // Set the actual player volume (playbackManager expects 0-100)
         const volumePercent = Math.round(this.mediaVolume * 100);
-        playbackManager.setVolume(volumePercent);
-        console.log('[VoiceChatCore] Set media volume:', volumePercent);
+
+        // On mobile browsers, playbackManager.setVolume may be ignored due to
+        // physical volume control check. Call the player's setVolume directly.
+        const currentPlayer = playbackManager.getCurrentPlayer();
+        if (currentPlayer && typeof currentPlayer.setVolume === 'function') {
+            currentPlayer.setVolume(volumePercent);
+            console.log('[VoiceChatCore] Set media volume via player:', volumePercent);
+        } else {
+            // Fallback to playbackManager
+            playbackManager.setVolume(volumePercent);
+            console.log('[VoiceChatCore] Set media volume via playbackManager:', volumePercent);
+        }
 
         // Also update via native bridge if available
         if (this.hasNativeSupport()) {
