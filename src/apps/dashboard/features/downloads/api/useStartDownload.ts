@@ -4,6 +4,7 @@ import { useApi } from 'hooks/useApi';
 import type { StartEpisodeDownloadRequest, StartMovieDownloadRequest, TorrentDownload } from '../types';
 import { QUERY_KEY as DOWNLOADS_KEY } from './useDownloads';
 import { QUERY_KEY as MISSING_KEY } from './useMissingEpisodes';
+import { authenticatedPost } from './authenticatedFetch';
 
 export const useStartEpisodeDownload = () => {
     const { api } = useApi();
@@ -11,11 +12,11 @@ export const useStartEpisodeDownload = () => {
 
     return useMutation({
         mutationFn: async (request: StartEpisodeDownloadRequest): Promise<TorrentDownload> => {
-            const response = await api!.axiosInstance.post<TorrentDownload>(
+            return authenticatedPost<TorrentDownload>(
+                api!,
                 '/MediaAcquisition/Downloads/Episode',
                 request
             );
-            return response.data;
         },
         onSuccess: (_, variables) => {
             // Invalidate downloads list
@@ -32,11 +33,11 @@ export const useStartMovieDownload = () => {
 
     return useMutation({
         mutationFn: async (request: StartMovieDownloadRequest): Promise<TorrentDownload> => {
-            const response = await api!.axiosInstance.post<TorrentDownload>(
+            return authenticatedPost<TorrentDownload>(
+                api!,
                 '/MediaAcquisition/Downloads/Movie',
                 request
             );
-            return response.data;
         },
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: [DOWNLOADS_KEY] });

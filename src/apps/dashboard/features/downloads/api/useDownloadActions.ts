@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { useApi } from 'hooks/useApi';
 import { QUERY_KEY } from './useDownloads';
+import { authenticatedPost, authenticatedDelete } from './authenticatedFetch';
 
 export const usePauseDownload = () => {
     const { api } = useApi();
@@ -9,7 +10,7 @@ export const usePauseDownload = () => {
 
     return useMutation({
         mutationFn: async (downloadId: string): Promise<void> => {
-            await api!.axiosInstance.post(`/MediaAcquisition/Downloads/${downloadId}/Pause`);
+            await authenticatedPost<void>(api!, `/MediaAcquisition/Downloads/${downloadId}/Pause`);
         },
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
@@ -23,7 +24,7 @@ export const useResumeDownload = () => {
 
     return useMutation({
         mutationFn: async (downloadId: string): Promise<void> => {
-            await api!.axiosInstance.post(`/MediaAcquisition/Downloads/${downloadId}/Resume`);
+            await authenticatedPost<void>(api!, `/MediaAcquisition/Downloads/${downloadId}/Resume`);
         },
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
@@ -37,7 +38,7 @@ export const useDeleteDownload = () => {
 
     return useMutation({
         mutationFn: async ({ downloadId, deleteFiles = false }: { downloadId: string; deleteFiles?: boolean }): Promise<void> => {
-            await api!.axiosInstance.delete(`/MediaAcquisition/Downloads/${downloadId}`, {
+            await authenticatedDelete<void>(api!, `/MediaAcquisition/Downloads/${downloadId}`, {
                 params: { deleteFiles }
             });
         },
@@ -53,7 +54,7 @@ export const useImportDownload = () => {
 
     return useMutation({
         mutationFn: async (downloadId: string): Promise<void> => {
-            await api!.axiosInstance.post(`/MediaAcquisition/Downloads/${downloadId}/Import`);
+            await authenticatedPost<void>(api!, `/MediaAcquisition/Downloads/${downloadId}/Import`);
         },
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });

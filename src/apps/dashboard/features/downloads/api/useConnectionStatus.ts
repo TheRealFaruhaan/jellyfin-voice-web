@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useApi } from 'hooks/useApi';
 import type { ConnectionStatus } from '../types';
+import { authenticatedGet } from './authenticatedFetch';
 
 export const QUERY_KEY = 'MediaAcquisitionStatus';
 
@@ -10,13 +11,11 @@ export const useConnectionStatus = () => {
 
     return useQuery({
         queryKey: [QUERY_KEY],
-        queryFn: async ({ signal }) => {
-            const response = await api!.axiosInstance.get<ConnectionStatus>(
-                '/MediaAcquisition/Status',
-                { signal }
-            );
-            return response.data;
-        },
+        queryFn: ({ signal }) => authenticatedGet<ConnectionStatus>(
+            api!,
+            '/MediaAcquisition/Status',
+            { signal }
+        ),
         enabled: !!api,
         refetchInterval: 30000 // Check every 30 seconds
     });
