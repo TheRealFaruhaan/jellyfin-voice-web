@@ -6,6 +6,7 @@ import GenresView from './GenresView';
 import ItemsView from './ItemsView';
 import GuideView from './GuideView';
 import ProgramsSectionView from './ProgramsSectionView';
+import { DiscoveryView } from '../../features/discovery/components';
 import { LibraryTab } from 'types/libraryTab';
 import type { ParentId } from 'types/library';
 import type { LibraryTabContent } from 'types/libraryTabContent';
@@ -97,6 +98,20 @@ const PageTabContent: FC<PageTabContentProps> = ({ parentId, currentTab }) => {
                 </Box>
 
                 <GuideView />
+            </>
+        );
+    }
+
+    if (currentTab.viewType === LibraryTab.Discover) {
+        return (
+            <>
+                <Box className='padded-top padded-left padded-right padded-bottom'>
+                    <LibraryViewMenu />
+                </Box>
+
+                <DiscoveryView
+                    category={currentTab.discoveryCategory || 'movies'}
+                />
             </>
         );
     }

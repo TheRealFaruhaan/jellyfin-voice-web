@@ -67,6 +67,11 @@ export const LibraryRoutes: LibraryRoute[] = [
                 index: 4,
                 label: 'Genres',
                 view: LibraryTab.Genres
+            },
+            {
+                index: 5,
+                label: 'Discover',
+                view: LibraryTab.Discover
             }
         ]
     },
@@ -144,6 +149,11 @@ export const LibraryRoutes: LibraryRoute[] = [
                 index: 5,
                 label: 'Episodes',
                 view: LibraryTab.Episodes
+            },
+            {
+                index: 6,
+                label: 'Discover',
+                view: LibraryTab.Discover
             }
         ]
     },

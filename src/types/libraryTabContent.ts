@@ -26,6 +26,7 @@ export interface LibraryTabContent {
     isBtnGridListEnabled?: boolean;
     isAlphabetPickerEnabled?: boolean;
     noItemsMessage?: string;
+    discoveryCategory?: 'movies' | 'tvshows';
 }
 
 export type LibraryTabMapping = Record<number, LibraryTabContent>;

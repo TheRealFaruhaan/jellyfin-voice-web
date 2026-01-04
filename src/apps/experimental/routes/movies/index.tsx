@@ -43,12 +43,18 @@ const genresTabContent: LibraryTabContent = {
     itemType: [BaseItemKind.Movie]
 };
 
+const discoverTabContent: LibraryTabContent = {
+    viewType: LibraryTab.Discover,
+    discoveryCategory: 'movies'
+};
+
 const moviesTabMapping: LibraryTabMapping = {
     0: moviesTabContent,
     1: suggestionsTabContent,
     2: favoritesTabContent,
     3: collectionsTabContent,
-    4: genresTabContent
+    4: genresTabContent,
+    5: discoverTabContent
 };
 
 const Movies: FC = () => {

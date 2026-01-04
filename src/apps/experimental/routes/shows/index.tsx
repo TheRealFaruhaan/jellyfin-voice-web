@@ -48,13 +48,19 @@ const genresTabContent: LibraryTabContent = {
     collectionType: CollectionType.Tvshows
 };
 
+const discoverTabContent: LibraryTabContent = {
+    viewType: LibraryTab.Discover,
+    discoveryCategory: 'tvshows'
+};
+
 const tvShowsTabMapping: LibraryTabMapping = {
     0: seriesTabContent,
     1: suggestionsTabContent,
     2: upcomingTabContent,
     3: genresTabContent,
     4: networksTabContent,
-    5: episodesTabContent
+    5: episodesTabContent,
+    6: discoverTabContent
 };
 
 const Shows: FC = () => {
