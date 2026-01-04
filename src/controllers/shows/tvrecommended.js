@@ -40,6 +40,9 @@ function getTabs() {
         {
             name: globalize.translate("Episodes"),
         },
+        {
+            name: globalize.translate("Discover"),
+        },
     ];
 }
 
@@ -59,6 +62,9 @@ function getDefaultTabIndex(folderId) {
 
         case LibraryTab.Episodes:
             return 5;
+
+        case LibraryTab.Discover:
+            return 6;
 
         default:
             return 0;
@@ -278,6 +284,10 @@ export default function (view, params) {
 
             case 5:
                 depends = "episodes";
+                break;
+
+            case 6:
+                depends = "tvdiscover";
                 break;
         }
 

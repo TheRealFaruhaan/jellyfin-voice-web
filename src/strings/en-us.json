@@ -248,6 +248,7 @@
     "DisablePlugin": "Disable",
     "DisableVbrAudioEncodingHelp": "Prevent the server from encoding audio with VBR for this client.",
     "Disc": "Disc",
+    "Discover": "Discover",
     "Disconnect": "Disconnect",
     "Display": "Display",
     "DisplayInMyMedia": "Display on home screen",
