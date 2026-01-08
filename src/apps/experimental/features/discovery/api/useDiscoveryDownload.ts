@@ -88,6 +88,7 @@ export interface DownloadTorrentParams {
  */
 export interface MovieDownloadParams extends DownloadTorrentParams {
     tmdbId: number;
+    movieTitle: string;
     year?: number;
 }
 
@@ -117,7 +118,9 @@ export const createMovieDownloadRequest = (
     params: MovieDownloadParams
 ): StartDiscoveryMovieDownloadRequest => ({
     tmdbId: params.tmdbId,
+    movieTitle: params.movieTitle,
     magnetLink: params.torrent.magnetLink,
+    downloadUrl: params.torrent.downloadUrl,
     title: params.torrent.title,
     size: params.torrent.size,
     seeders: params.torrent.seeders,
@@ -136,6 +139,7 @@ export const createSeasonDownloadRequest = (
     tmdbId: params.tmdbId,
     seasonNumber: params.seasonNumber,
     magnetLink: params.torrent.magnetLink,
+    downloadUrl: params.torrent.downloadUrl,
     title: params.torrent.title,
     size: params.torrent.size,
     seeders: params.torrent.seeders,
@@ -155,6 +159,7 @@ export const createEpisodeDownloadRequest = (
     seasonNumber: params.seasonNumber,
     episodeNumber: params.episodeNumber,
     magnetLink: params.torrent.magnetLink,
+    downloadUrl: params.torrent.downloadUrl,
     title: params.torrent.title,
     size: params.torrent.size,
     seeders: params.torrent.seeders,

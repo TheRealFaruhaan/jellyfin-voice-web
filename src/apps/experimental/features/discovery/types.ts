@@ -111,7 +111,9 @@ export interface DiskSpaceInfo {
  */
 export interface StartDiscoveryMovieDownloadRequest {
     tmdbId: number;
+    movieTitle: string;
     magnetLink: string;
+    downloadUrl?: string;
     title: string;
     size: number;
     seeders: number;
@@ -128,6 +130,7 @@ export interface StartDiscoverySeasonDownloadRequest {
     tmdbId: number;
     seasonNumber: number;
     magnetLink: string;
+    downloadUrl?: string;
     title: string;
     size: number;
     seeders: number;
@@ -145,6 +148,7 @@ export interface StartDiscoveryEpisodeDownloadRequest {
     seasonNumber: number;
     episodeNumber: number;
     magnetLink: string;
+    downloadUrl?: string;
     title: string;
     size: number;
     seeders: number;

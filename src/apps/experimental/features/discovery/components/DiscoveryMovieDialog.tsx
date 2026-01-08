@@ -52,6 +52,7 @@ const DiscoveryMovieDialog: FC<DiscoveryMovieDialogProps> = ({
         await downloadMutation.mutateAsync(
             createMovieDownloadRequest({
                 tmdbId,
+                movieTitle: movie.title,
                 torrent,
                 year
             })
@@ -69,6 +70,7 @@ const DiscoveryMovieDialog: FC<DiscoveryMovieDialogProps> = ({
         await downloadMutation.mutateAsync(
             createMovieDownloadRequest({
                 tmdbId,
+                movieTitle: movie.title,
                 torrent,
                 year
             })
