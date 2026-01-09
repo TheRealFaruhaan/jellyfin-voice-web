@@ -43,7 +43,7 @@ export const useStartDiscoverySeasonDownload = () => {
         mutationFn: async (request: StartDiscoverySeasonDownloadRequest): Promise<TorrentDownload> => {
             return authenticatedPost<TorrentDownload>(
                 api!,
-                '/Discovery/TvShows/Season/Download',
+                '/Discovery/TvShows/Download',
                 request
             );
         },
@@ -65,7 +65,7 @@ export const useStartDiscoveryEpisodeDownload = () => {
         mutationFn: async (request: StartDiscoveryEpisodeDownloadRequest): Promise<TorrentDownload> => {
             return authenticatedPost<TorrentDownload>(
                 api!,
-                '/Discovery/TvShows/Episode/Download',
+                '/Discovery/TvShows/Download',
                 request
             );
         },
@@ -138,6 +138,7 @@ export const createSeasonDownloadRequest = (
 ): StartDiscoverySeasonDownloadRequest => ({
     tmdbId: params.tmdbId,
     seasonNumber: params.seasonNumber,
+    episodeNumber: 0,
     magnetLink: params.torrent.magnetLink,
     downloadUrl: params.torrent.downloadUrl,
     title: params.torrent.title,
@@ -146,7 +147,7 @@ export const createSeasonDownloadRequest = (
     leechers: params.torrent.leechers,
     quality: params.torrent.quality,
     indexerName: params.torrent.indexerName,
-    seriesName: params.seriesName
+    showName: params.seriesName
 });
 
 /**
@@ -166,5 +167,5 @@ export const createEpisodeDownloadRequest = (
     leechers: params.torrent.leechers,
     quality: params.torrent.quality,
     indexerName: params.torrent.indexerName,
-    seriesName: params.seriesName
+    showName: params.seriesName
 });

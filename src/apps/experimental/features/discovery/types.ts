@@ -129,6 +129,7 @@ export interface StartDiscoveryMovieDownloadRequest {
 export interface StartDiscoverySeasonDownloadRequest {
     tmdbId: number;
     seasonNumber: number;
+    episodeNumber: number;
     magnetLink: string;
     downloadUrl?: string;
     title: string;
@@ -137,7 +138,7 @@ export interface StartDiscoverySeasonDownloadRequest {
     leechers: number;
     quality?: string;
     indexerName?: string;
-    seriesName: string;
+    showName: string;
 }
 
 /**
@@ -155,7 +156,7 @@ export interface StartDiscoveryEpisodeDownloadRequest {
     leechers: number;
     quality?: string;
     indexerName?: string;
-    seriesName: string;
+    showName: string;
 }
 
 /**
