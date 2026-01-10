@@ -6,13 +6,16 @@ import CardMedia from '@mui/material/CardMedia';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
+import CircularProgress from '@mui/material/CircularProgress';
 import StarIcon from '@mui/icons-material/Star';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import DownloadingIcon from '@mui/icons-material/Downloading';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 
 import type { DiscoveryMovie, DiscoveryTvShow } from '../types';
 import { useAddFavorite, useRemoveFavorite } from '../api/useDiscoveryFavorites';
+import { useIsDownloading } from '../api/useDiscoveryDownloadStatus';
 
 interface DiscoveryCardProps {
     item: DiscoveryMovie | DiscoveryTvShow;
@@ -29,6 +32,7 @@ const DiscoveryCard: FC<DiscoveryCardProps> = ({
 }) => {
     const addFavoriteMutation = useAddFavorite();
     const removeFavoriteMutation = useRemoveFavorite();
+    const { isDownloading, progress } = useIsDownloading(item.id, type);
 
     const title = type === 'movie'
         ? (item as DiscoveryMovie).title
@@ -124,22 +128,64 @@ const DiscoveryCard: FC<DiscoveryCardProps> = ({
                 </Box>
             </CardActionArea>
 
-            {/* In Library indicator */}
-            {item.existsInLibrary && (
-                <Chip
-                    icon={<CheckCircleIcon sx={{ fontSize: '14px !important' }} />}
-                    label='In Library'
-                    size='small'
-                    color='success'
+            {/* Downloading indicator with progress */}
+            {isDownloading && (
+                <Box
                     sx={{
                         position: 'absolute',
                         top: 8,
                         right: 8,
-                        height: 22,
-                        '& .MuiChip-label': { px: 0.75, fontSize: '0.7rem' },
-                        '& .MuiChip-icon': { ml: 0.5 }
+                        bgcolor: 'rgba(0, 0, 0, 0.7)',
+                        borderRadius: '50%',
+                        p: 0.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
                     }}
-                />
+                >
+                    <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                        <CircularProgress
+                            variant='determinate'
+                            value={progress}
+                            size={28}
+                            thickness={5}
+                            sx={{ color: 'primary.main' }}
+                        />
+                        <Box
+                            sx={{
+                                top: 0,
+                                left: 0,
+                                bottom: 0,
+                                right: 0,
+                                position: 'absolute',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            <DownloadingIcon sx={{ fontSize: 14, color: 'white' }} />
+                        </Box>
+                    </Box>
+                </Box>
+            )}
+
+            {/* In Library indicator - only show if not downloading */}
+            {!isDownloading && item.existsInLibrary && (
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        bgcolor: 'rgba(0, 0, 0, 0.7)',
+                        borderRadius: '50%',
+                        p: 0.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
+                >
+                    <CheckCircleIcon sx={{ fontSize: 22, color: 'success.main' }} />
+                </Box>
             )}
 
             {/* Favorite button */}
