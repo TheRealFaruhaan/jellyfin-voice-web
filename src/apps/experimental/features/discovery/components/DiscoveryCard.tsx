@@ -1,14 +1,18 @@
-import React, { type FC } from 'react';
+import React, { type FC, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardActionArea from '@mui/material/CardActionArea';
 import CardMedia from '@mui/material/CardMedia';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
+import IconButton from '@mui/material/IconButton';
 import StarIcon from '@mui/icons-material/Star';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 
 import type { DiscoveryMovie, DiscoveryTvShow } from '../types';
+import { useAddFavorite, useRemoveFavorite } from '../api/useDiscoveryFavorites';
 
 interface DiscoveryCardProps {
     item: DiscoveryMovie | DiscoveryTvShow;
@@ -23,6 +27,9 @@ const DiscoveryCard: FC<DiscoveryCardProps> = ({
     imageBaseUrl = 'https://image.tmdb.org/t/p/w342',
     onClick
 }) => {
+    const addFavoriteMutation = useAddFavorite();
+    const removeFavoriteMutation = useRemoveFavorite();
+
     const title = type === 'movie'
         ? (item as DiscoveryMovie).title
         : (item as DiscoveryTvShow).name;
@@ -34,6 +41,28 @@ const DiscoveryCard: FC<DiscoveryCardProps> = ({
     const posterUrl = item.posterPath
         ? `${imageBaseUrl}${item.posterPath}`
         : undefined;
+
+    const handleFavoriteClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        const movieItem = type === 'movie' ? (item as DiscoveryMovie) : null;
+        const tvItem = type === 'tvshow' ? (item as DiscoveryTvShow) : null;
+
+        if (item.isFavorite) {
+            removeFavoriteMutation.mutate({
+                tmdbId: item.id,
+                mediaType: type
+            });
+        } else {
+            addFavoriteMutation.mutate({
+                tmdbId: item.id,
+                mediaType: type,
+                title,
+                posterPath: item.posterPath || undefined,
+                year: year ? parseInt(year, 10) : undefined
+            });
+        }
+    }, [item, type, title, year, addFavoriteMutation, removeFavoriteMutation]);
 
     return (
         <Card
@@ -112,6 +141,27 @@ const DiscoveryCard: FC<DiscoveryCardProps> = ({
                     }}
                 />
             )}
+
+            {/* Favorite button */}
+            <IconButton
+                onClick={handleFavoriteClick}
+                size='small'
+                sx={{
+                    position: 'absolute',
+                    top: 8,
+                    left: 8,
+                    bgcolor: 'rgba(0, 0, 0, 0.6)',
+                    '&:hover': {
+                        bgcolor: 'rgba(0, 0, 0, 0.8)'
+                    }
+                }}
+            >
+                {item.isFavorite ? (
+                    <FavoriteIcon sx={{ fontSize: 18, color: 'error.main' }} />
+                ) : (
+                    <FavoriteBorderIcon sx={{ fontSize: 18, color: 'white' }} />
+                )}
+            </IconButton>
         </Card>
     );
 };

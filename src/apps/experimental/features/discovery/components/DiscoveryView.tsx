@@ -10,6 +10,7 @@ import IconButton from '@mui/material/IconButton';
 import SearchIcon from '@mui/icons-material/Search';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import StarIcon from '@mui/icons-material/Star';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 import Pagination from '@mui/material/Pagination';
 
 import {
@@ -20,6 +21,7 @@ import {
     usePopularTvShows,
     useSearchTvShows
 } from '../api/useDiscoveryApi';
+import { useDiscoveryFavorites } from '../api/useDiscoveryFavorites';
 import type { DiscoveryMovie, DiscoveryTvShow, DiscoveryViewMode } from '../types';
 import DiscoveryCard from './DiscoveryCard';
 import DiscoveryMovieDialog from './DiscoveryMovieDialog';
@@ -50,6 +52,9 @@ const DiscoveryView: FC<DiscoveryViewProps> = ({ category }) => {
     const { data: trendingTvShows, isLoading: isLoadingTrendingTvShows } = useTrendingTvShows(page);
     const { data: popularTvShows, isLoading: isLoadingPopularTvShows } = usePopularTvShows(page);
     const { data: searchedTvShows, isLoading: isLoadingSearchTvShows } = useSearchTvShows(activeSearch, undefined, page);
+
+    // Favorites query
+    const { data: favorites, isLoading: isLoadingFavorites } = useDiscoveryFavorites();
 
     const handleViewModeChange = useCallback((_: React.MouseEvent<HTMLElement>, newMode: DiscoveryViewMode | null) => {
         if (newMode) {
@@ -93,7 +98,32 @@ const DiscoveryView: FC<DiscoveryViewProps> = ({ category }) => {
     let isLoading = false;
     let totalPages = 1;
 
-    if (category === 'movies') {
+    if (viewMode === 'favorites') {
+        // Filter favorites by category
+        const filteredFavorites = (favorites || []).filter(fav =>
+            (category === 'movies' && fav.MediaType === 'movie') ||
+            (category === 'tvshows' && fav.MediaType === 'tvshow')
+        );
+
+        // Convert favorites to display items (minimal data)
+        items = filteredFavorites.map(fav => ({
+            id: fav.TmdbId,
+            title: fav.Title || '',
+            name: fav.Title || '',
+            posterPath: fav.PosterPath || null,
+            voteAverage: 0,
+            voteCount: 0,
+            popularity: 0,
+            genreIds: [],
+            existsInLibrary: false,
+            isFavorite: true,
+            releaseDate: fav.Year ? `${fav.Year}-01-01` : undefined,
+            firstAirDate: fav.Year ? `${fav.Year}-01-01` : undefined
+        })) as any;
+
+        isLoading = isLoadingFavorites;
+        totalPages = 1; // No pagination for favorites
+    } else if (category === 'movies') {
         if (viewMode === 'trending') {
             items = trendingMovies?.results || [];
             isLoading = isLoadingTrendingMovies;
@@ -143,6 +173,10 @@ const DiscoveryView: FC<DiscoveryViewProps> = ({ category }) => {
                     <ToggleButton value='popular'>
                         <StarIcon sx={{ mr: 0.5 }} />
                         Popular
+                    </ToggleButton>
+                    <ToggleButton value='favorites'>
+                        <FavoriteIcon sx={{ mr: 0.5 }} />
+                        Favorites
                     </ToggleButton>
                 </ToggleButtonGroup>
 

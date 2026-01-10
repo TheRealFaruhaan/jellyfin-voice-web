@@ -30,6 +30,7 @@ export interface DiscoveryMovie {
     externalIds?: DiscoveryExternalIds;
     existsInLibrary: boolean;
     jellyfinItemId?: string;
+    isFavorite: boolean;
 }
 
 /**
@@ -51,6 +52,7 @@ export interface DiscoveryTvShow {
     externalIds?: DiscoveryExternalIds;
     existsInLibrary: boolean;
     jellyfinItemId?: string;
+    isFavorite: boolean;
     numberOfSeasons?: number;
     numberOfEpisodes?: number;
 }
@@ -191,7 +193,7 @@ export interface TorrentSearchResult {
 /**
  * Discovery view mode.
  */
-export type DiscoveryViewMode = 'trending' | 'popular' | 'search';
+export type DiscoveryViewMode = 'trending' | 'popular' | 'search' | 'favorites';
 
 /**
  * Discovery category.

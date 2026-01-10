@@ -47,6 +47,7 @@ function renderHeader() {
     html += '</div>';
     html += '<div class="headerRight">';
     html += '<button is="paper-icon-button-light" class="headerSyncButton syncButton headerButton headerButtonRight hide"><span class="material-icons groups" aria-hidden="true"></span></button>';
+    html += '<button is="paper-icon-button-light" class="headerDownloadsButton downloadsButton headerButton headerButtonRight hide" style="position: relative;"><span class="material-icons cloud_download" aria-hidden="true"></span><span class="downloadsBadge hide" style="position: absolute; top: 4px; right: 4px; background: #e74c3c; color: white; border-radius: 10px; padding: 2px 6px; font-size: 11px; font-weight: bold; min-width: 18px; text-align: center;"></span></button>';
     html += '<span class="headerSelectedPlayer"></span>';
     html += '<button is="paper-icon-button-light" class="headerAudioPlayerButton audioPlayerButton headerButton headerButtonRight hide"><span class="material-icons music_note" aria-hidden="true"></span></button>';
     html += '<button is="paper-icon-button-light" class="headerCastButton castButton headerButton headerButtonRight hide"><span class="material-icons cast" aria-hidden="true"></span></button>';
@@ -72,6 +73,8 @@ function renderHeader() {
     headerAudioPlayerButton = skinHeader.querySelector('.headerAudioPlayerButton');
     headerSearchButton = skinHeader.querySelector('.headerSearchButton');
     headerSyncButton = skinHeader.querySelector('.headerSyncButton');
+    headerDownloadsButton = skinHeader.querySelector('.headerDownloadsButton');
+    downloadsBadge = skinHeader.querySelector('.downloadsBadge');
     currentTimeText = skinHeader.querySelector('.currentTimeText');
 
     retranslateUi();
@@ -114,6 +117,10 @@ function retranslateUi() {
 
     if (headerSyncButton) {
         headerSyncButton.title = globalize.translate('ButtonSyncPlay');
+    }
+
+    if (headerDownloadsButton) {
+        headerDownloadsButton.title = 'Downloads';
     }
 
     if (headerAudioPlayerButton) {
@@ -251,6 +258,7 @@ function bindMenuEvents() {
 
     headerAudioPlayerButton.addEventListener('click', showAudioPlayer);
     headerSyncButton.addEventListener('click', onSyncButtonClicked);
+    headerDownloadsButton.addEventListener('click', onDownloadsButtonClicked);
 
     if (layoutManager.mobile) {
         initHeadRoom(skinHeader);
@@ -284,6 +292,11 @@ function onCastButtonClicked() {
 function onSyncButtonClicked() {
     const btn = this;
     groupSelectionMenu.show(btn);
+}
+
+function onDownloadsButtonClicked() {
+    // Navigate to downloads management page (dashboard)
+    Dashboard.navigate('downloads');
 }
 
 function getItemHref(item, context) {
@@ -700,6 +713,8 @@ let headerCastButton;
 let headerSearchButton;
 let headerAudioPlayerButton;
 let headerSyncButton;
+let headerDownloadsButton;
+let downloadsBadge;
 let currentTimeText;
 const enableLibraryNavDrawer = layoutManager.desktop;
 const enableLibraryNavDrawerHome = !layoutManager.tv;
@@ -851,8 +866,62 @@ Events.on(ServerConnections, 'localusersignedout', function () {
 
 Events.on(playbackManager, 'playerchange', updateCastIcon);
 
+// Poll for active downloads to show/hide downloads button
+let downloadsPollingInterval;
+
+async function checkActiveDownloads() {
+    const apiClient = getCurrentApiClient();
+    if (!apiClient || !headerDownloadsButton) {
+        return;
+    }
+
+    try {
+        const response = await apiClient.getJSON(apiClient.getUrl('/MediaAcquisition/Downloads/Active'));
+        const activeDownloads = response || [];
+        const activeCount = activeDownloads.filter(d =>
+            ['Downloading', 'Queued', 'Paused'].includes(d.State)
+        ).length;
+
+        if (activeCount > 0) {
+            headerDownloadsButton.classList.remove('hide');
+            if (downloadsBadge) {
+                downloadsBadge.textContent = activeCount;
+                downloadsBadge.classList.remove('hide');
+            }
+        } else {
+            headerDownloadsButton.classList.add('hide');
+            if (downloadsBadge) {
+                downloadsBadge.classList.add('hide');
+            }
+        }
+    } catch (error) {
+        // Silently fail if endpoint doesn't exist or error occurs
+        headerDownloadsButton.classList.add('hide');
+    }
+}
+
+function startDownloadsPolling() {
+    if (downloadsPollingInterval) {
+        clearInterval(downloadsPollingInterval);
+    }
+    checkActiveDownloads(); // Check immediately
+    downloadsPollingInterval = setInterval(checkActiveDownloads, 5000); // Check every 5 seconds
+}
+
+function stopDownloadsPolling() {
+    if (downloadsPollingInterval) {
+        clearInterval(downloadsPollingInterval);
+        downloadsPollingInterval = null;
+    }
+}
+
+// Start polling when user signs in
+Events.on(ServerConnections, 'localusersignedin', startDownloadsPolling);
+Events.on(ServerConnections, 'localusersignedout', stopDownloadsPolling);
+
 fetchServerName(getCurrentApiClient());
 loadNavDrawer();
+startDownloadsPolling(); // Start polling on page load if user is already signed in
 
 const LibraryMenu = {
     getTopParentId,
