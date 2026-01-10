@@ -98,5 +98,11 @@ export const LEGACY_USER_ROUTES: LegacyRoute[] = [
             controller: 'movies/moviesrecommended',
             view: 'movies/movies.html'
         }
+    }, {
+        path: 'downloads',
+        pageProps: {
+            controller: 'downloads',
+            view: 'downloads.html'
+        }
     }
 ];

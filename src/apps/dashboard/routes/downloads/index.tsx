@@ -30,7 +30,7 @@ const TabPanel: FunctionComponent<TabPanelProps> = ({ children, value, index, ..
     );
 };
 
-const DownloadsPage: FunctionComponent = () => {
+export const Component: FunctionComponent = () => {
     const [tabValue, setTabValue] = React.useState(0);
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -69,4 +69,4 @@ const DownloadsPage: FunctionComponent = () => {
     );
 };
 
-export default DownloadsPage;
+Component.displayName = 'DownloadsPage';

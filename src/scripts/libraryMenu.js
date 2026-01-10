@@ -295,7 +295,7 @@ function onSyncButtonClicked() {
 }
 
 function onDownloadsButtonClicked() {
-    // Navigate to downloads management page (dashboard)
+    // Navigate to downloads page (accessible to all users)
     Dashboard.navigate('downloads');
 }
 
