@@ -38,6 +38,20 @@ export const discoveryKeys = {
 };
 
 /**
+ * Torrent searches fan out to external indexers and can legitimately take a while, so they
+ * get a generous client timeout. They are deliberately not retried: a retry just re-runs a
+ * minute-long search and leaves the spinner up for several more minutes instead of
+ * surfacing the failure.
+ */
+export const TORRENT_SEARCH_TIMEOUT_MS = 120_000;
+
+const TORRENT_SEARCH_OPTIONS = {
+    retry: false,
+    staleTime: 0,
+    gcTime: 0
+} as const;
+
+/**
  * Hook to get trending movies.
  */
 export const useTrendingMovies = (page: number = 1) => {
@@ -121,10 +135,12 @@ export const useMovieTorrents = (tmdbId: number, enabled: boolean = true) => {
         queryFn: async () => {
             return authenticatedGet<TorrentSearchResult[]>(
                 api!,
-                `/Discovery/Movies/${tmdbId}/Torrents`
+                `/Discovery/Movies/${tmdbId}/Torrents`,
+                { timeout: TORRENT_SEARCH_TIMEOUT_MS }
             );
         },
-        enabled: !!api && enabled && tmdbId > 0
+        enabled: !!api && enabled && tmdbId > 0,
+        ...TORRENT_SEARCH_OPTIONS
     });
 };
 
@@ -230,10 +246,12 @@ export const useSeasonTorrents = (tmdbId: number, seasonNumber: number, enabled:
         queryFn: async () => {
             return authenticatedGet<TorrentSearchResult[]>(
                 api!,
-                `/Discovery/TvShows/${tmdbId}/Seasons/${seasonNumber}/Torrents`
+                `/Discovery/TvShows/${tmdbId}/Seasons/${seasonNumber}/Torrents`,
+                { timeout: TORRENT_SEARCH_TIMEOUT_MS }
             );
         },
-        enabled: !!api && enabled && tmdbId > 0 && seasonNumber >= 0
+        enabled: !!api && enabled && tmdbId > 0 && seasonNumber >= 0,
+        ...TORRENT_SEARCH_OPTIONS
     });
 };
 
@@ -253,10 +271,12 @@ export const useEpisodeTorrents = (
         queryFn: async () => {
             return authenticatedGet<TorrentSearchResult[]>(
                 api!,
-                `/Discovery/TvShows/${tmdbId}/Seasons/${seasonNumber}/Episodes/${episodeNumber}/Torrents`
+                `/Discovery/TvShows/${tmdbId}/Seasons/${seasonNumber}/Episodes/${episodeNumber}/Torrents`,
+                { timeout: TORRENT_SEARCH_TIMEOUT_MS }
             );
         },
-        enabled: !!api && enabled && tmdbId > 0 && seasonNumber >= 0 && episodeNumber > 0
+        enabled: !!api && enabled && tmdbId > 0 && seasonNumber >= 0 && episodeNumber > 0,
+        ...TORRENT_SEARCH_OPTIONS
     });
 };
 

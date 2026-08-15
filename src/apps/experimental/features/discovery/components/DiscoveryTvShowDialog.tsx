@@ -22,6 +22,8 @@ import ListItemText from '@mui/material/ListItemText';
 import ListItemSecondaryAction from '@mui/material/ListItemSecondaryAction';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 
 import {
     useTvShowDetails,
@@ -60,16 +62,27 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
     const [selectedEpisodeNumber, setSelectedEpisodeNumber] = useState<number | null>(null);
     const [showCustomSearch, setShowCustomSearch] = useState(false);
 
+    const theme = useTheme();
+    const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
     const { data: tvShow, isLoading: isLoadingTvShow } = useTvShowDetails(tmdbId, open);
     const { data: seasonDetails, isLoading: isLoadingSeason } = useSeasonDetails(
         tmdbId,
         expandedSeason ?? 0,
         expandedSeason !== null
     );
-    const { data: seasonTorrents, isLoading: isLoadingSeasonTorrents, refetch: refetchSeasonTorrents } =
-        useSeasonTorrents(tmdbId, selectedSeasonNumber ?? 0, showSeasonTorrents && selectedSeasonNumber !== null);
-    const { data: episodeTorrents, isLoading: isLoadingEpisodeTorrents, refetch: refetchEpisodeTorrents } =
-        useEpisodeTorrents(
+    const {
+        data: seasonTorrents,
+        isLoading: isLoadingSeasonTorrents,
+        error: seasonTorrentsError,
+        refetch: refetchSeasonTorrents
+    } = useSeasonTorrents(tmdbId, selectedSeasonNumber ?? 0, showSeasonTorrents && selectedSeasonNumber !== null);
+    const {
+        data: episodeTorrents,
+        isLoading: isLoadingEpisodeTorrents,
+        error: episodeTorrentsError,
+        refetch: refetchEpisodeTorrents
+    } = useEpisodeTorrents(
             tmdbId,
             selectedSeasonNumber ?? 0,
             selectedEpisodeNumber ?? 0,
@@ -158,7 +171,7 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
 
     return (
         <>
-            <Dialog open={open} onClose={onClose} maxWidth='md' fullWidth>
+            <Dialog open={open} onClose={onClose} maxWidth='md' fullWidth fullScreen={isSmallScreen}>
                 <DialogTitle sx={{ pb: 0 }}>
                     {isLoadingTvShow ? 'Loading...' : tvShow?.name}
                 </DialogTitle>
@@ -170,11 +183,22 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
                         </Box>
                     ) : tvShow ? (
                         <>
-                            <Box sx={{ display: 'flex', gap: 3, mt: 2, mb: 3 }}>
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    // Side by side leaves the overview a few characters wide on a
+                                    // phone, so stack it instead.
+                                    flexDirection: { xs: 'column', sm: 'row' },
+                                    alignItems: { xs: 'center', sm: 'flex-start' },
+                                    gap: { xs: 2, sm: 3 },
+                                    mt: 2,
+                                    mb: 3
+                                }}
+                            >
                                 {/* Poster */}
                                 <Box
                                     sx={{
-                                        width: 150,
+                                        width: { xs: 160, sm: 150 },
                                         flexShrink: 0,
                                         bgcolor: 'grey.800',
                                         borderRadius: 1,
@@ -195,7 +219,7 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
                                 </Box>
 
                                 {/* Details */}
-                                <Box sx={{ flex: 1 }}>
+                                <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
                                         {year && (
                                             <Chip label={year} size='small' />
@@ -222,7 +246,18 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
                                     </Box>
 
                                     {tvShow.overview && (
-                                        <Typography variant='body2' color='text.secondary'>
+                                        <Typography
+                                            variant='body2'
+                                            color='text.secondary'
+                                            sx={{
+                                                // Keep a long synopsis from pushing the season
+                                                // list off the bottom of a phone screen.
+                                                display: '-webkit-box',
+                                                WebkitBoxOrient: 'vertical',
+                                                WebkitLineClamp: { xs: 5, sm: 'unset' },
+                                                overflow: { xs: 'hidden', sm: 'visible' }
+                                            }}
+                                        >
                                             {tvShow.overview}
                                         </Typography>
                                     )}
@@ -321,6 +356,7 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
                 results={seasonTorrents || []}
                 isLoading={isLoadingSeasonTorrents}
                 isDownloading={seasonDownloadMutation.isPending}
+                error={seasonTorrentsError}
                 diskSpace={diskSpace}
                 onDownload={handleSeasonDownload}
                 onRefresh={() => refetchSeasonTorrents()}
@@ -334,6 +370,7 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
                 results={episodeTorrents || []}
                 isLoading={isLoadingEpisodeTorrents}
                 isDownloading={episodeDownloadMutation.isPending}
+                error={episodeTorrentsError}
                 diskSpace={diskSpace}
                 onDownload={handleEpisodeDownload}
                 onRefresh={() => refetchEpisodeTorrents()}

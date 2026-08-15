@@ -22,6 +22,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import Tooltip from '@mui/material/Tooltip';
 import Alert from '@mui/material/Alert';
 import InputAdornment from '@mui/material/InputAdornment';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 
 import { useCustomTorrentSearch } from '../api/useDiscoveryApi';
 import type { TorrentSearchResult, DiskSpaceInfo } from '../types';
@@ -43,6 +45,9 @@ const CustomSearchDialog: FC<CustomSearchDialogProps> = ({
     diskSpace,
     onDownload
 }) => {
+    const theme = useTheme();
+    const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
     const [query, setQuery] = useState(defaultQuery);
     const [searchQuery, setSearchQuery] = useState('');
     const [isDownloading, setIsDownloading] = useState(false);
@@ -83,7 +88,7 @@ const CustomSearchDialog: FC<CustomSearchDialogProps> = ({
     const hasDiskSpaceWarning = diskSpace && !diskSpace.hasEnoughSpace;
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth='lg' fullWidth>
+        <Dialog open={open} onClose={onClose} maxWidth='lg' fullWidth fullScreen={isSmallScreen}>
             <DialogTitle>Custom Torrent Search</DialogTitle>
             <DialogContent>
                 {hasDiskSpaceWarning && (

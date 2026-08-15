@@ -62,12 +62,13 @@ export const useLiveDownloads = () => {
     useEffect(() => {
         if (!__legacyApiClient__) return;
 
-        // Subscribe to torrent progress updates
-        // The message type corresponds to what we send from TorrentProgressEventEmitter
-        Events.on(serverNotifications, 'RefreshProgress', handleProgressUpdate);
+        // Subscribe to torrent progress updates.
+        // Must not reuse 'RefreshProgress' — that is Jellyfin's own library-scan progress
+        // message, whose payload has no download id and would be inserted as a bogus row.
+        Events.on(serverNotifications, 'TorrentProgress', handleProgressUpdate);
 
         return () => {
-            Events.off(serverNotifications, 'RefreshProgress', handleProgressUpdate);
+            Events.off(serverNotifications, 'TorrentProgress', handleProgressUpdate);
         };
     }, [__legacyApiClient__, handleProgressUpdate]);
 };

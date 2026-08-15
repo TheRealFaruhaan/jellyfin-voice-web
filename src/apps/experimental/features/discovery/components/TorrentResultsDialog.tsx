@@ -19,6 +19,8 @@ import IconButton from '@mui/material/IconButton';
 import DownloadIcon from '@mui/icons-material/Download';
 import Tooltip from '@mui/material/Tooltip';
 import Alert from '@mui/material/Alert';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 
 import type { TorrentSearchResult, DiskSpaceInfo } from '../types';
 
@@ -29,6 +31,7 @@ interface TorrentResultsDialogProps {
     results: TorrentSearchResult[];
     isLoading: boolean;
     isDownloading: boolean;
+    error?: unknown;
     diskSpace?: DiskSpaceInfo;
     onDownload: (torrent: TorrentSearchResult) => void;
     onRefresh: () => void;
@@ -41,14 +44,18 @@ const TorrentResultsDialog: FC<TorrentResultsDialogProps> = ({
     results,
     isLoading,
     isDownloading,
+    error,
     diskSpace,
     onDownload,
     onRefresh
 }) => {
+    const theme = useTheme();
+    const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
     const hasDiskSpaceWarning = diskSpace && !diskSpace.hasEnoughSpace;
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth='lg' fullWidth>
+        <Dialog open={open} onClose={onClose} maxWidth='lg' fullWidth fullScreen={isSmallScreen}>
             <DialogTitle>{title}</DialogTitle>
             <DialogContent>
                 {hasDiskSpaceWarning && (
@@ -57,15 +64,29 @@ const TorrentResultsDialog: FC<TorrentResultsDialogProps> = ({
                     </Alert>
                 )}
 
-                {isLoading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                {isLoading && (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, p: 4 }}>
                         <CircularProgress />
+                        <Typography color='text.secondary' variant='body2'>
+                            Searching indexers — this can take up to a minute.
+                        </Typography>
                     </Box>
-                ) : results.length === 0 ? (
+                )}
+
+                {!isLoading && !!error && (
+                    <Alert severity='error' sx={{ my: 2 }}>
+                        Torrent search failed. The indexer may be slow or unreachable — check
+                        the Prowlarr/Jackett connection, then retry.
+                    </Alert>
+                )}
+
+                {!isLoading && !error && results.length === 0 && (
                     <Typography color='text.secondary' sx={{ p: 2, textAlign: 'center' }}>
                         No torrents found. Try adjusting your indexer settings or use custom search.
                     </Typography>
-                ) : (
+                )}
+
+                {!isLoading && !error && results.length > 0 && (
                     <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
                         <Table stickyHeader size='small'>
                             <TableHead>

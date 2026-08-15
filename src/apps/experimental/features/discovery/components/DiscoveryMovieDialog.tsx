@@ -12,6 +12,8 @@ import StarIcon from '@mui/icons-material/Star';
 import DownloadIcon from '@mui/icons-material/Download';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import SearchIcon from '@mui/icons-material/Search';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 
 import { useMovieDetails, useMovieTorrents, useDiskSpace } from '../api/useDiscoveryApi';
 import {
@@ -38,8 +40,11 @@ const DiscoveryMovieDialog: FC<DiscoveryMovieDialogProps> = ({
     const [showTorrents, setShowTorrents] = useState(false);
     const [showCustomSearch, setShowCustomSearch] = useState(false);
 
+    const theme = useTheme();
+    const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
     const { data: movie, isLoading: isLoadingMovie } = useMovieDetails(tmdbId, open);
-    const { data: torrents, isLoading: isLoadingTorrents, refetch: refetchTorrents } = useMovieTorrents(tmdbId, showTorrents);
+    const { data: torrents, isLoading: isLoadingTorrents, error: torrentsError, refetch: refetchTorrents } = useMovieTorrents(tmdbId, showTorrents);
     const { data: diskSpace } = useDiskSpace('movies');
 
     const downloadMutation = useStartDiscoveryMovieDownload();
@@ -92,7 +97,7 @@ const DiscoveryMovieDialog: FC<DiscoveryMovieDialogProps> = ({
 
     return (
         <>
-            <Dialog open={open} onClose={onClose} maxWidth='md' fullWidth>
+            <Dialog open={open} onClose={onClose} maxWidth='md' fullWidth fullScreen={isSmallScreen}>
                 <DialogTitle sx={{ pb: 0 }}>
                     {isLoadingMovie ? 'Loading...' : movie?.title}
                 </DialogTitle>
@@ -103,11 +108,20 @@ const DiscoveryMovieDialog: FC<DiscoveryMovieDialogProps> = ({
                             <CircularProgress />
                         </Box>
                     ) : movie ? (
-                        <Box sx={{ display: 'flex', gap: 3, mt: 2 }}>
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                // Stack on phones; side by side the details column is unreadably narrow.
+                                flexDirection: { xs: 'column', sm: 'row' },
+                                alignItems: { xs: 'center', sm: 'flex-start' },
+                                gap: { xs: 2, sm: 3 },
+                                mt: 2
+                            }}
+                        >
                             {/* Poster */}
                             <Box
                                 sx={{
-                                    width: 200,
+                                    width: { xs: 180, sm: 200 },
                                     flexShrink: 0,
                                     bgcolor: 'grey.800',
                                     borderRadius: 1,
@@ -128,8 +142,8 @@ const DiscoveryMovieDialog: FC<DiscoveryMovieDialogProps> = ({
                             </Box>
 
                             {/* Details */}
-                            <Box sx={{ flex: 1 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                            <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
                                     {year && (
                                         <Chip label={year} size='small' />
                                     )}
@@ -200,6 +214,7 @@ const DiscoveryMovieDialog: FC<DiscoveryMovieDialogProps> = ({
                 results={torrents || []}
                 isLoading={isLoadingTorrents}
                 isDownloading={downloadMutation.isPending}
+                error={torrentsError}
                 diskSpace={diskSpace}
                 onDownload={handleDownload}
                 onRefresh={() => refetchTorrents()}
