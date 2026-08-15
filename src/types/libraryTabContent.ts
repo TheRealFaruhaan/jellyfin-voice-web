@@ -14,7 +14,7 @@ export interface SectionsView {
 export interface LibraryTabContent {
     viewType: LibraryTab;
     itemType?: BaseItemKind[];
-    collectionType?: CollectionType;
+    collectionType?: CollectionType | null;
     sectionsView?: SectionsView;
     isPaginationEnabled?: boolean;
     isBtnPlayAllEnabled?: boolean;
@@ -23,10 +23,9 @@ export interface LibraryTabContent {
     isBtnSortEnabled?: boolean;
     isBtnFilterEnabled?: boolean;
     isBtnNewCollectionEnabled?: boolean;
+    isBtnNewPlaylistEnabled?: boolean;
     isBtnGridListEnabled?: boolean;
     isAlphabetPickerEnabled?: boolean;
     noItemsMessage?: string;
     discoveryCategory?: 'movies' | 'tvshows';
 }
-
-export type LibraryTabMapping = Record<number, LibraryTabContent>;
