@@ -17,6 +17,14 @@ export const useLiveDownloads = () => {
 
     const handleProgressUpdate = useCallback(
         (_evt: Event, _apiClient: unknown, data: TorrentDownload) => {
+            // Ignore anything that isn't a recognisable download. Without this an
+            // unexpected payload shape gets prepended as a row with no id, which
+            // renders as an empty placeholder card.
+            if (!data?.id) {
+                console.warn('[useLiveDownloads] ignoring progress payload with no id', data);
+                return;
+            }
+
             // Update the specific download in the cache
             queryClient.setQueryData<TorrentDownload[]>([QUERY_KEY], (oldData) => {
                 if (!oldData) return oldData;
