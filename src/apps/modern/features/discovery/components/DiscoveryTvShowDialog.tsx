@@ -61,6 +61,9 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
     const [selectedSeasonNumber, setSelectedSeasonNumber] = useState<number | null>(null);
     const [selectedEpisodeNumber, setSelectedEpisodeNumber] = useState<number | null>(null);
     const [showCustomSearch, setShowCustomSearch] = useState(false);
+    // Which season/episode a custom search applies to, so results are filed into the
+    // right season folder instead of always landing in Season 01.
+    const [customSearchScope, setCustomSearchScope] = useState<{ seasonNumber: number; episodeNumber?: number } | null>(null);
 
     const theme = useTheme();
     const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
@@ -108,6 +111,16 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
         setShowEpisodeTorrents(true);
     }, []);
 
+    const handleOpenSeasonCustomSearch = useCallback((seasonNumber: number) => {
+        setCustomSearchScope({ seasonNumber });
+        setShowCustomSearch(true);
+    }, []);
+
+    const handleOpenEpisodeCustomSearch = useCallback((seasonNumber: number, episodeNumber: number) => {
+        setCustomSearchScope({ seasonNumber, episodeNumber });
+        setShowCustomSearch(true);
+    }, []);
+
     const handleSeasonDownload = useCallback(async (torrent: TorrentSearchResult) => {
         if (!tvShow || selectedSeasonNumber === null) return;
 
@@ -142,21 +155,47 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
     }, [tvShow, tmdbId, selectedSeasonNumber, selectedEpisodeNumber, episodeDownloadMutation, onClose]);
 
     const handleCustomDownload = useCallback(async (torrent: TorrentSearchResult) => {
-        if (!tvShow || selectedSeasonNumber === null) return;
+        if (!tvShow || !customSearchScope) return;
 
-        // Use season download for custom search
-        await seasonDownloadMutation.mutateAsync(
-            createSeasonDownloadRequest({
-                tmdbId,
-                seasonNumber: selectedSeasonNumber,
-                seriesName: tvShow.name,
-                torrent
-            })
-        );
+        const { seasonNumber, episodeNumber } = customSearchScope;
+
+        if (episodeNumber !== undefined) {
+            await episodeDownloadMutation.mutateAsync(
+                createEpisodeDownloadRequest({
+                    tmdbId,
+                    seasonNumber,
+                    episodeNumber,
+                    seriesName: tvShow.name,
+                    torrent
+                })
+            );
+        } else {
+            await seasonDownloadMutation.mutateAsync(
+                createSeasonDownloadRequest({
+                    tmdbId,
+                    seasonNumber,
+                    seriesName: tvShow.name,
+                    torrent
+                })
+            );
+        }
 
         setShowCustomSearch(false);
+        setCustomSearchScope(null);
         onClose();
-    }, [tvShow, tmdbId, selectedSeasonNumber, seasonDownloadMutation, onClose]);
+    }, [tvShow, tmdbId, customSearchScope, seasonDownloadMutation, episodeDownloadMutation, onClose]);
+
+    // Seed the custom search with the season/episode it is scoped to.
+    const customSearchQuery = (() => {
+        const name = tvShow?.name || '';
+        if (!customSearchScope) return name;
+        const { seasonNumber, episodeNumber } = customSearchScope;
+        const season = `S${String(seasonNumber).padStart(2, '0')}`;
+        if (episodeNumber !== undefined) {
+            return `${name} ${season}E${String(episodeNumber).padStart(2, '0')}`;
+        }
+        return `${name} ${season}`;
+    })();
 
     const posterUrl = tvShow?.posterPath
         ? `https://image.tmdb.org/t/p/w342${tvShow.posterPath}`
@@ -326,16 +365,26 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
                             ))}
 
                             <Box sx={{ mt: 2 }}>
-                                <Button
-                                    variant='outlined'
-                                    startIcon={<SearchIcon />}
-                                    onClick={() => {
-                                        setSelectedSeasonNumber(1);
-                                        setShowCustomSearch(true);
-                                    }}
+                                <Tooltip
+                                    title={expandedSeason === null
+                                        ? 'Expand a season first, so the download is filed into that season folder'
+                                        : `Custom search for Season ${expandedSeason}`}
                                 >
-                                    Custom Search
-                                </Button>
+                                    <span>
+                                        <Button
+                                            variant='outlined'
+                                            startIcon={<SearchIcon />}
+                                            disabled={expandedSeason === null}
+                                            onClick={() => {
+                                                if (expandedSeason !== null) {
+                                                    handleOpenSeasonCustomSearch(expandedSeason);
+                                                }
+                                            }}
+                                        >
+                                            Custom Search
+                                        </Button>
+                                    </span>
+                                </Tooltip>
                             </Box>
                         </>
                     ) : (
@@ -353,6 +402,8 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
                 open={showSeasonTorrents}
                 onClose={() => setShowSeasonTorrents(false)}
                 title={`Season ${selectedSeasonNumber} Torrents - ${tvShow?.name || 'TV Show'}`}
+                category='tv'
+                defaultQuery={`${tvShow?.name || ''} S${String(selectedSeasonNumber ?? 0).padStart(2, '0')}`}
                 results={seasonTorrents || []}
                 isLoading={isLoadingSeasonTorrents}
                 isDownloading={seasonDownloadMutation.isPending}
@@ -367,6 +418,8 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
                 open={showEpisodeTorrents}
                 onClose={() => setShowEpisodeTorrents(false)}
                 title={`S${selectedSeasonNumber}E${selectedEpisodeNumber} Torrents - ${tvShow?.name || 'TV Show'}`}
+                category='tv'
+                defaultQuery={`${tvShow?.name || ''} S${String(selectedSeasonNumber ?? 0).padStart(2, '0')}E${String(selectedEpisodeNumber ?? 0).padStart(2, '0')}`}
                 results={episodeTorrents || []}
                 isLoading={isLoadingEpisodeTorrents}
                 isDownloading={episodeDownloadMutation.isPending}
@@ -379,8 +432,11 @@ const DiscoveryTvShowDialog: FC<DiscoveryTvShowDialogProps> = ({
             {/* Custom Search Dialog */}
             <CustomSearchDialog
                 open={showCustomSearch}
-                onClose={() => setShowCustomSearch(false)}
-                defaultQuery={tvShow?.name || ''}
+                onClose={() => {
+                    setShowCustomSearch(false);
+                    setCustomSearchScope(null);
+                }}
+                defaultQuery={customSearchQuery}
                 category='tv'
                 diskSpace={diskSpace}
                 onDownload={handleCustomDownload}

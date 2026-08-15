@@ -1,4 +1,4 @@
-import React, { type FC } from 'react';
+import React, { type FC, useState, useEffect, useCallback } from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -19,9 +19,14 @@ import IconButton from '@mui/material/IconButton';
 import DownloadIcon from '@mui/icons-material/Download';
 import Tooltip from '@mui/material/Tooltip';
 import Alert from '@mui/material/Alert';
+import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
+import SearchIcon from '@mui/icons-material/Search';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 
+import { useCustomTorrentSearch } from '../api/useDiscoveryApi';
 import type { TorrentSearchResult, DiskSpaceInfo } from '../types';
 
 interface TorrentResultsDialogProps {
@@ -33,6 +38,10 @@ interface TorrentResultsDialogProps {
     isDownloading: boolean;
     error?: unknown;
     diskSpace?: DiskSpaceInfo;
+    /** Category used when the user refines the search in place. */
+    category?: 'movie' | 'tv';
+    /** Seed for the refine field, e.g. "Show Name S03". */
+    defaultQuery?: string;
     onDownload: (torrent: TorrentSearchResult) => void;
     onRefresh: () => void;
 }
@@ -46,11 +55,50 @@ const TorrentResultsDialog: FC<TorrentResultsDialogProps> = ({
     isDownloading,
     error,
     diskSpace,
+    category = 'movie',
+    defaultQuery = '',
     onDownload,
     onRefresh
 }) => {
     const theme = useTheme();
     const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
+    // Refining runs a custom search scoped to whatever this dialog was opened for,
+    // so the download still files into the correct season/episode folder.
+    const [queryInput, setQueryInput] = useState(defaultQuery);
+    const [refinedQuery, setRefinedQuery] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (open) {
+            setQueryInput(defaultQuery);
+            setRefinedQuery(null);
+        }
+    }, [open, defaultQuery]);
+
+    const refined = useCustomTorrentSearch(refinedQuery ?? '', category, !!refinedQuery);
+
+    const isRefined = !!refinedQuery;
+    const shownResults = isRefined ? (refined.data ?? []) : results;
+    const shownLoading = isRefined ? refined.isLoading : isLoading;
+    const shownError = isRefined ? refined.error : error;
+
+    const handleRefine = useCallback(() => {
+        const q = queryInput.trim();
+        if (q.length >= 2) setRefinedQuery(q);
+    }, [queryInput]);
+
+    const handleResetRefine = useCallback(() => {
+        setQueryInput(defaultQuery);
+        setRefinedQuery(null);
+    }, [defaultQuery]);
+
+    const handleQueryKeyDown = useCallback((e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') handleRefine();
+    }, [handleRefine]);
+
+    const handleQueryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        setQueryInput(e.target.value);
+    }, []);
 
     const hasDiskSpaceWarning = diskSpace && !diskSpace.hasEnoughSpace;
 
@@ -58,13 +106,57 @@ const TorrentResultsDialog: FC<TorrentResultsDialogProps> = ({
         <Dialog open={open} onClose={onClose} maxWidth='lg' fullWidth fullScreen={isSmallScreen}>
             <DialogTitle>{title}</DialogTitle>
             <DialogContent>
+                <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'center' }}>
+                    <TextField
+                        fullWidth
+                        size='small'
+                        label='Refine search'
+                        value={queryInput}
+                        onChange={handleQueryChange}
+                        onKeyDown={handleQueryKeyDown}
+                        placeholder='e.g. Show Name S03 1080p'
+                        slotProps={{
+                            input: {
+                                startAdornment: (
+                                    <InputAdornment position='start'>
+                                        <SearchIcon fontSize='small' />
+                                    </InputAdornment>
+                                )
+                            }
+                        }}
+                    />
+                    <Button
+                        variant='contained'
+                        onClick={handleRefine}
+                        disabled={queryInput.trim().length < 2 || shownLoading}
+                    >
+                        Search
+                    </Button>
+                    {isRefined && (
+                        <Tooltip title='Back to automatic results'>
+                            <span>
+                                <IconButton onClick={handleResetRefine} disabled={shownLoading}>
+                                    <RestartAltIcon />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                    )}
+                </Box>
+
+                {isRefined && (
+                    <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mb: 1 }}>
+                        Showing refined results. Downloads still go to the same place as the
+                        automatic search.
+                    </Typography>
+                )}
+
                 {hasDiskSpaceWarning && (
                     <Alert severity='warning' sx={{ mb: 2 }}>
                         Low disk space! Free: {diskSpace.formattedFreeSpace}, Required minimum: {diskSpace.formattedMinimumRequired}
                     </Alert>
                 )}
 
-                {isLoading && (
+                {shownLoading && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, p: 4 }}>
                         <CircularProgress />
                         <Typography color='text.secondary' variant='body2'>
@@ -73,20 +165,20 @@ const TorrentResultsDialog: FC<TorrentResultsDialogProps> = ({
                     </Box>
                 )}
 
-                {!isLoading && !!error && (
+                {!shownLoading && !!shownError && (
                     <Alert severity='error' sx={{ my: 2 }}>
                         Torrent search failed. The indexer may be slow or unreachable — check
                         the Prowlarr/Jackett connection, then retry.
                     </Alert>
                 )}
 
-                {!isLoading && !error && results.length === 0 && (
+                {!shownLoading && !shownError && shownResults.length === 0 && (
                     <Typography color='text.secondary' sx={{ p: 2, textAlign: 'center' }}>
                         No torrents found. Try adjusting your indexer settings or use custom search.
                     </Typography>
                 )}
 
-                {!isLoading && !error && results.length > 0 && (
+                {!shownLoading && !shownError && shownResults.length > 0 && (
                     <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
                         <Table stickyHeader size='small'>
                             <TableHead>
@@ -100,7 +192,7 @@ const TorrentResultsDialog: FC<TorrentResultsDialogProps> = ({
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {results.map((result, index) => (
+                                {shownResults.map((result, index) => (
                                     <TableRow key={index} hover>
                                         <TableCell>
                                             <Typography variant='body2' noWrap sx={{ maxWidth: 400 }} title={result.title}>

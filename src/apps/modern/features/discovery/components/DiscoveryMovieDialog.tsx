@@ -211,6 +211,8 @@ const DiscoveryMovieDialog: FC<DiscoveryMovieDialogProps> = ({
                 open={showTorrents}
                 onClose={() => setShowTorrents(false)}
                 title={`Torrents for ${movie?.title || 'Movie'}`}
+                category='movie'
+                defaultQuery={movie ? [movie.title, year].filter(Boolean).join(' ') : ''}
                 results={torrents || []}
                 isLoading={isLoadingTorrents}
                 isDownloading={downloadMutation.isPending}
@@ -224,7 +226,7 @@ const DiscoveryMovieDialog: FC<DiscoveryMovieDialogProps> = ({
             <CustomSearchDialog
                 open={showCustomSearch}
                 onClose={() => setShowCustomSearch(false)}
-                defaultQuery={movie?.title || ''}
+                defaultQuery={movie ? [movie.title, year].filter(Boolean).join(' ') : ''}
                 category='movie'
                 diskSpace={diskSpace}
                 onDownload={handleCustomDownload}

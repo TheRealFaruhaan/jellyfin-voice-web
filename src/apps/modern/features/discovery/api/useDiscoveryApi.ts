@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useApi } from 'hooks/useApi';
-import { authenticatedGet } from 'apps/dashboard/features/downloads/api/authenticatedFetch';
+import { authenticatedGet, authenticatedPost } from 'apps/dashboard/features/downloads/api/authenticatedFetch';
 import type {
     DiscoveryMovie,
     DiscoveryTvShow,
@@ -307,11 +307,17 @@ export const useCustomTorrentSearch = (query: string, category: 'movie' | 'tv', 
     return useQuery({
         queryKey: discoveryKeys.customSearch(query, category),
         queryFn: async () => {
-            return authenticatedGet<TorrentSearchResult[]>(
+            // The server exposes this as POST /Discovery/Torrents/Search with a JSON body.
+            // It was previously called as GET /Discovery/Search/Custom, which does not
+            // exist, so custom search always 404'd and showed no results.
+            return authenticatedPost<TorrentSearchResult[]>(
                 api!,
-                `/Discovery/Search/Custom?query=${encodeURIComponent(query)}&category=${category}`
+                '/Discovery/Torrents/Search',
+                { query, category },
+                { timeout: TORRENT_SEARCH_TIMEOUT_MS }
             );
         },
-        enabled: !!api && enabled && query.length >= 2
+        enabled: !!api && enabled && query.length >= 2,
+        ...TORRENT_SEARCH_OPTIONS
     });
 };
